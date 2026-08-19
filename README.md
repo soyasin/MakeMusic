@@ -52,8 +52,8 @@ npm run dev
 |------|------|
 | 템포 (BPM) | 60–180 BPM 슬라이더 |
 | 키 | C, D, E, F, G, A, B |
-| 장르 | Ambient, Electronic, Hip-Hop, Pop |
-| 길이 | 4, 8, 12, 16 마디 |
+| 장르 | Ambient, Electronic, Hip-Hop, Pop, Game OST |
+| 길이 | 1분, 3분, 루프형 |
 | 재생 | Tone.js 를 통한 브라우저 내 실시간 재생 |
 | 파형 시각화 | Canvas 기반 실시간 웨이브폼 |
 | MIDI 다운로드 | Ableton Live 등에 임포트 가능한 `.mid` 파일 |

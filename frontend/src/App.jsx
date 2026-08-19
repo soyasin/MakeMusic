@@ -3,8 +3,12 @@ import * as Tone from 'tone';
 import './App.css';
 
 const KEYS    = ['C', 'D', 'E', 'F', 'G', 'A', 'B'];
-const GENRES  = ['Ambient', 'Electronic', 'Hip-Hop', 'Pop'];
-const BARS    = [4, 8, 12, 16];
+const GENRES  = ['Ambient', 'Electronic', 'Hip-Hop', 'Pop', 'Game OST'];
+const LENGTH_MODES = [
+  { value: '1min', label: '1분', bars: 30, approx: '약 30초 재생', isLoop: false },
+  { value: '3min', label: '3분', bars: 90, approx: '약 1.5분 재생', isLoop: false },
+  { value: 'loop', label: '루프형', bars: 16, approx: '무한 반복', isLoop: true },
+];
 
 // I-IV-V-I chord roots in semitones above key root
 const CHORD_DEGREES = [0, 5, 7, 0];
@@ -22,7 +26,7 @@ export default function App() {
   const [bpm,     setBpm]     = useState(120);
   const [key,     setKey]     = useState('C');
   const [genre,   setGenre]   = useState('Pop');
-  const [bars,    setBars]    = useState(8);
+  const [lengthMode, setLengthMode] = useState('1min');
   const [status,  setStatus]  = useState('idle'); // idle | generating | playing | error
   const [midiUrl, setMidiUrl] = useState(null);
   const [midiName, setMidiName] = useState('');
@@ -43,6 +47,7 @@ export default function App() {
     }
     Tone.getTransport().stop();
     Tone.getTransport().cancel();
+    Tone.getTransport().loop = false;
     if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
     if (synthsRef.current) {
       synthsRef.current.forEach(s => s.dispose());
@@ -80,6 +85,9 @@ export default function App() {
     stopPlayback();
 
     Tone.getTransport().bpm.value = bpm;
+    const transport = Tone.getTransport();
+    const selectedLength = LENGTH_MODES.find((m) => m.value === lengthMode) || LENGTH_MODES[0];
+    const bars = selectedLength.bars;
 
     const rootMidi = NOTE_MIDI[key] || 60;
     const scale    = MAJOR_SCALE.map(i => rootMidi + i);
@@ -163,14 +171,23 @@ export default function App() {
     part.start(0);
     partRef.current = part;
 
-    Tone.getTransport().start();
+    if (selectedLength.isLoop) {
+      transport.loop = true;
+      transport.loopStart = 0;
+      transport.loopEnd = `${bars}m`;
+    } else {
+      transport.loop = false;
+    }
+
+    transport.start();
     setStatus('playing');
     drawWave();
 
-    // Auto-stop after all bars played
-    const totalSecs = Tone.Time(`${bars}m`).toSeconds();
-    setTimeout(() => stopPlayback(), (totalSecs + 1) * 1000);
-  }, [bpm, key, bars, stopPlayback, drawWave]);
+    if (!selectedLength.isLoop) {
+      const totalSecs = Tone.Time(`${bars}m`).toSeconds();
+      setTimeout(() => stopPlayback(), (totalSecs + 1) * 1000);
+    }
+  }, [bpm, key, lengthMode, stopPlayback, drawWave]);
 
   const handleGenerate = async () => {
     setStatus('generating');
@@ -179,7 +196,7 @@ export default function App() {
       const res = await fetch('/api/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ bpm, key, genre, bars }),
+        body: JSON.stringify({ bpm, key, genre, length_mode: lengthMode }),
       });
       if (!res.ok) throw new Error('서버 오류');
       const blob = await res.blob();
@@ -238,12 +255,18 @@ export default function App() {
             </div>
           </div>
 
-          {/* Bars */}
+          {/* Length mode */}
           <div className="control-group">
-            <label>길이 (마디)</label>
+            <label>길이</label>
             <div className="btn-group">
-              {BARS.map(b => (
-                <button key={b} className={bars === b ? 'active' : ''} onClick={() => setBars(b)}>{b}</button>
+              {LENGTH_MODES.map(mode => (
+                <button
+                  key={mode.value}
+                  className={lengthMode === mode.value ? 'active' : ''}
+                  onClick={() => setLengthMode(mode.value)}
+                >
+                  {mode.label} ({mode.approx})
+                </button>
               ))}
             </div>
           </div>

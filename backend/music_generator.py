@@ -11,22 +11,34 @@ KEY_ROOT = {
 
 # Major scale intervals
 MAJOR_SCALE = [0, 2, 4, 5, 7, 9, 11]
+MINOR_SCALE = [0, 2, 3, 5, 7, 8, 10]
 
 # I-IV-V-I chord progression degrees (0-indexed)
 CHORD_PROGRESSION = [0, 3, 4, 0]  # I, IV, V, I
+GAME_OST_PROGRESSION = [0, 5, 2, 6]
 
 # Major chord intervals
 MAJOR_CHORD = [0, 4, 7]
+MINOR_CHORD = [0, 3, 7]
 
 # Simple drum pattern (General MIDI channel 10, 0-indexed = ch 9)
 KICK   = 36
 SNARE  = 38
 HIHAT  = 42
 
-def _ticks_per_beat(bpm, desired_ms=500):
-    return 480  # standard
+def _bars_from_length_mode(length_mode: str) -> int:
+    if length_mode == '3min':
+        return 90
+    if length_mode == 'loop':
+        return 100
+    return 30
 
-def generate_midi(bpm: int, key: str, genre: str, bars: int) -> bytes:
+
+def generate_midi(bpm: int, key: str, genre: str, length_mode: str) -> bytes:
+    bars = _bars_from_length_mode(length_mode)
+    if genre == 'Game OST':
+        bpm = max(80, min(100, bpm))
+
     ticks_per_beat = 480
     tempo = mido.bpm2tempo(bpm)  # microseconds per beat
 
@@ -74,14 +86,17 @@ def generate_midi(bpm: int, key: str, genre: str, bars: int) -> bytes:
     chord_track.append(MetaMessage('track_name', name='Chords', time=0))
 
     root = KEY_ROOT.get(key, 60)
-    scale = [root + i for i in MAJOR_SCALE]
+    scale_intervals = MINOR_SCALE if genre == 'Game OST' else MAJOR_SCALE
+    chord_progression = GAME_OST_PROGRESSION if genre == 'Game OST' else CHORD_PROGRESSION
+    chord_intervals = MINOR_CHORD if genre == 'Game OST' else MAJOR_CHORD
+    scale = [root + i for i in scale_intervals]
 
     chord_events = []
     beats_per_chord = 4  # one chord per bar (4/4)
     for bar in range(bars):
-        degree = CHORD_PROGRESSION[bar % len(CHORD_PROGRESSION)]
+        degree = chord_progression[bar % len(chord_progression)]
         chord_root = scale[degree]
-        notes = [chord_root + i for i in MAJOR_CHORD]
+        notes = [chord_root + i for i in chord_intervals]
         t_on = bar * beat * 4
         t_off = t_on + beat * 4 - 1
         for n in notes:
@@ -103,18 +118,26 @@ def generate_midi(bpm: int, key: str, genre: str, bars: int) -> bytes:
     melody_track.append(MetaMessage('track_name', name='Melody', time=0))
 
     melody_events = []
+    game_ost_pattern = [scale[0], scale[2], scale[3], scale[2]]
     for bar in range(bars):
-        degree = CHORD_PROGRESSION[bar % len(CHORD_PROGRESSION)]
+        degree = chord_progression[bar % len(chord_progression)]
         chord_root = scale[degree]
-        # pick scale notes around chord root
-        available = [chord_root + i for i in MAJOR_SCALE if 0 <= i <= 12]
-        note_duration = beat  # quarter notes
-        for beat_i in range(4):
-            note = random.choice(available)
-            t_on  = bar * beat * 4 + beat_i * beat
-            t_off = t_on + note_duration - 1
-            melody_events.append((t_on,  'note_on',  1, note, 90))
-            melody_events.append((t_off, 'note_off', 1, note, 0))
+        if genre == 'Game OST':
+            note_duration = beat // 2
+            for step, note in enumerate(game_ost_pattern):
+                t_on = bar * beat * 4 + step * note_duration
+                t_off = t_on + note_duration - 1
+                melody_events.append((t_on, 'note_on', 1, note, 70))
+                melody_events.append((t_off, 'note_off', 1, note, 0))
+        else:
+            available = [chord_root + i for i in MAJOR_SCALE if 0 <= i <= 12]
+            note_duration = beat  # quarter notes
+            for beat_i in range(4):
+                note = random.choice(available)
+                t_on  = bar * beat * 4 + beat_i * beat
+                t_off = t_on + note_duration - 1
+                melody_events.append((t_on,  'note_on',  1, note, 90))
+                melody_events.append((t_off, 'note_off', 1, note, 0))
 
     melody_events.sort(key=lambda x: x[0])
     prev = 0
