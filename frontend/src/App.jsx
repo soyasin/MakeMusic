@@ -7,13 +7,31 @@ const GENRES  = ['Ambient', 'Electronic', 'Hip-Hop', 'Pop', 'Game OST'];
 const LENGTH_MODES = [
   { value: '1min', label: '1분', bars: 30, approx: '약 30초 재생', isLoop: false },
   { value: '3min', label: '3분', bars: 90, approx: '약 1.5분 재생', isLoop: false },
-  { value: 'loop', label: '루프형', bars: 16, approx: '무한 반복', isLoop: true },
+  { value: 'loop', label: '루프형', bars: 100, approx: '무한 반복', isLoop: true },
+];
+const MOODS = [
+  { value: 'bright', label: '밝음' },
+  { value: 'dark', label: '어두움' },
+  { value: 'mysterious', label: '신비로움' },
+];
+const COMPLEXITIES = [
+  { value: 'simple', label: '심플' },
+  { value: 'normal', label: '보통' },
+  { value: 'complex', label: '복잡' },
+];
+const DYNAMICS = [
+  { value: 'soft', label: '부드럽게' },
+  { value: 'normal', label: '보통' },
+  { value: 'strong', label: '강하게' },
 ];
 
 // I-IV-V-I chord roots in semitones above key root
 const CHORD_DEGREES = [0, 5, 7, 0];
+const DARK_CHORD_DEGREES = [0, 8, 3, 10];
 const MAJOR_CHORD   = [0, 4, 7];
+const MINOR_CHORD   = [0, 3, 7];
 const MAJOR_SCALE   = [0, 2, 4, 5, 7, 9, 11];
+const MINOR_SCALE   = [0, 2, 3, 5, 7, 8, 10];
 
 // Note name -> MIDI-style number helper
 const NOTE_MIDI = { C: 60, D: 62, E: 64, F: 65, G: 67, A: 69, B: 71 };
@@ -27,6 +45,9 @@ export default function App() {
   const [key,     setKey]     = useState('C');
   const [genre,   setGenre]   = useState('Pop');
   const [lengthMode, setLengthMode] = useState('1min');
+  const [mood, setMood] = useState('bright');
+  const [complexity, setComplexity] = useState('normal');
+  const [dynamics, setDynamics] = useState('normal');
   const [status,  setStatus]  = useState('idle'); // idle | generating | playing | error
   const [midiUrl, setMidiUrl] = useState(null);
   const [midiName, setMidiName] = useState('');
@@ -84,32 +105,39 @@ export default function App() {
     await Tone.start();
     stopPlayback();
 
-    Tone.getTransport().bpm.value = bpm;
+    const effectiveBpm = genre === 'Game OST' ? Math.max(80, Math.min(100, bpm)) : bpm;
+    Tone.getTransport().bpm.value = effectiveBpm;
     const transport = Tone.getTransport();
     const selectedLength = LENGTH_MODES.find((m) => m.value === lengthMode) || LENGTH_MODES[0];
     const bars = selectedLength.bars;
 
     const rootMidi = NOTE_MIDI[key] || 60;
-    const scale    = MAJOR_SCALE.map(i => rootMidi + i);
+    const isDarkTone = genre === 'Game OST' || mood !== 'bright';
+    const scaleIntervals = isDarkTone ? MINOR_SCALE : MAJOR_SCALE;
+    const chordDegrees = isDarkTone ? DARK_CHORD_DEGREES : CHORD_DEGREES;
+    const chordIntervals = isDarkTone ? MINOR_CHORD : MAJOR_CHORD;
+    const scale = scaleIntervals.map(i => rootMidi + i);
+    const dynamicMap = { soft: -12, normal: -8, strong: -4 };
 
     // Synths
     const chordSynth = new Tone.PolySynth(Tone.Synth, {
-      oscillator: { type: 'triangle' },
-      envelope: { attack: 0.05, decay: 0.1, sustain: 0.6, release: 0.5 },
+      oscillator: { type: mood === 'mysterious' ? 'sine' : 'triangle' },
+      envelope: { attack: mood === 'mysterious' ? 0.2 : 0.05, decay: 0.1, sustain: 0.6, release: mood === 'mysterious' ? 1.2 : 0.5 },
       volume: -10,
     }).toDestination();
 
     const melodySynth = new Tone.Synth({
-      oscillator: { type: 'sine' },
-      envelope: { attack: 0.01, decay: 0.05, sustain: 0.5, release: 0.3 },
-      volume: -8,
+      oscillator: { type: mood === 'bright' ? 'triangle' : 'sine' },
+      envelope: { attack: mood === 'mysterious' ? 0.08 : 0.01, decay: 0.05, sustain: 0.5, release: mood === 'mysterious' ? 0.8 : 0.3 },
+      volume: dynamicMap[dynamics] ?? -8,
     }).toDestination();
 
-    const kickSynth = new Tone.MembraneSynth({ volume: -6 }).toDestination();
+    const drumVolMap = { soft: -16, normal: -9, strong: -4 };
+    const kickSynth = new Tone.MembraneSynth({ volume: drumVolMap[dynamics] ?? -9 }).toDestination();
     const snareSynth = new Tone.NoiseSynth({
       noise: { type: 'white' },
       envelope: { attack: 0.001, decay: 0.15, sustain: 0, release: 0.05 },
-      volume: -12,
+      volume: (drumVolMap[dynamics] ?? -9) - 6,
     }).toDestination();
     const hihatSynth = new Tone.MetalSynth({
       frequency: 400,
@@ -118,7 +146,7 @@ export default function App() {
       modulationIndex: 32,
       resonance: 4000,
       octaves: 1.5,
-      volume: -20,
+      volume: (drumVolMap[dynamics] ?? -9) - 10,
     }).toDestination();
 
     // Analyser
@@ -132,34 +160,42 @@ export default function App() {
     const seqEvents = [];
 
     for (let bar = 0; bar < bars; bar++) {
-      const degree    = CHORD_DEGREES[bar % CHORD_DEGREES.length];
+      const degree    = chordDegrees[bar % chordDegrees.length];
       const chordRoot = rootMidi + degree;
-      const chordNotes = MAJOR_CHORD.map(i => Tone.Frequency(chordRoot + i, 'midi').toNote());
+      const chordNotes = chordIntervals.map(i => Tone.Frequency(chordRoot + i, 'midi').toNote());
 
       const barTime = `${bar}m`;
 
       // Chord (whole bar)
       seqEvents.push({ time: barTime, fn: () => chordSynth.triggerAttackRelease(chordNotes, '2n') });
 
-      // Melody — one note per beat
-      for (let beat = 0; beat < 4; beat++) {
+      // Melody density by complexity
+      const notesPerBar = complexity === 'simple' ? 2 : complexity === 'complex' ? 8 : 4;
+      const noteUnit = notesPerBar === 2 ? '2n' : notesPerBar === 8 ? '16n' : '4n';
+      const stepDuration = (Tone.Time('1m').toSeconds()) / notesPerBar;
+      for (let step = 0; step < notesPerBar; step++) {
         const noteIdx  = Math.floor(Math.random() * scale.length);
         const noteFreq = Tone.Frequency(scale[noteIdx], 'midi').toNote();
-        seqEvents.push({ time: Tone.Time(`${bar}m`).toSeconds() + Tone.Time(`${beat}n`).toSeconds(), fn: () => melodySynth.triggerAttackRelease(noteFreq, '8n') });
+        const stepTime = Tone.Time(`${bar}m`).toSeconds() + step * stepDuration;
+        seqEvents.push({ time: stepTime, fn: () => melodySynth.triggerAttackRelease(noteFreq, noteUnit) });
       }
 
       // Drums per beat
       for (let beat = 0; beat < 4; beat++) {
         const tSec = Tone.Time(`${bar}m`).toSeconds() + Tone.Time(`${beat}n`).toSeconds();
-        // hi-hat every beat
-        seqEvents.push({ time: tSec, fn: () => hihatSynth.triggerAttackRelease('32n') });
+        // hi-hat every beat (skip some in soft mode)
+        if (!(dynamics === 'soft' && beat === 3)) {
+          seqEvents.push({ time: tSec, fn: () => hihatSynth.triggerAttackRelease('32n') });
+        }
         // kick on 1 & 3
         if (beat === 0 || beat === 2) seqEvents.push({ time: tSec, fn: () => kickSynth.triggerAttackRelease('C1', '8n') });
         // snare on 2 & 4
         if (beat === 1 || beat === 3) seqEvents.push({ time: tSec, fn: () => snareSynth.triggerAttackRelease('8n') });
         // 8th note hi-hat (offbeat)
-        const offSec = tSec + Tone.Time('8n').toSeconds();
-        seqEvents.push({ time: offSec, fn: () => hihatSynth.triggerAttackRelease('32n') });
+        if (complexity !== 'simple') {
+          const offSec = tSec + Tone.Time('8n').toSeconds();
+          seqEvents.push({ time: offSec, fn: () => hihatSynth.triggerAttackRelease('32n') });
+        }
       }
     }
 
@@ -187,7 +223,7 @@ export default function App() {
       const totalSecs = Tone.Time(`${bars}m`).toSeconds();
       setTimeout(() => stopPlayback(), (totalSecs + 1) * 1000);
     }
-  }, [bpm, key, lengthMode, stopPlayback, drawWave]);
+  }, [bpm, key, genre, lengthMode, mood, complexity, dynamics, stopPlayback, drawWave]);
 
   const handleGenerate = async () => {
     setStatus('generating');
@@ -196,7 +232,7 @@ export default function App() {
       const res = await fetch('/api/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ bpm, key, genre, length_mode: lengthMode }),
+        body: JSON.stringify({ bpm, key, genre, length_mode: lengthMode, mood, complexity, dynamics }),
       });
       if (!res.ok) throw new Error('서버 오류');
       const blob = await res.blob();
@@ -266,6 +302,51 @@ export default function App() {
                   onClick={() => setLengthMode(mode.value)}
                 >
                   {mode.label} ({mode.approx})
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="control-group">
+            <label>무드</label>
+            <div className="btn-group">
+              {MOODS.map(option => (
+                <button
+                  key={option.value}
+                  className={mood === option.value ? 'active' : ''}
+                  onClick={() => setMood(option.value)}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="control-group">
+            <label>리듬 복잡도</label>
+            <div className="btn-group">
+              {COMPLEXITIES.map(option => (
+                <button
+                  key={option.value}
+                  className={complexity === option.value ? 'active' : ''}
+                  onClick={() => setComplexity(option.value)}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="control-group">
+            <label>다이내믹</label>
+            <div className="btn-group">
+              {DYNAMICS.map(option => (
+                <button
+                  key={option.value}
+                  className={dynamics === option.value ? 'active' : ''}
+                  onClick={() => setDynamics(option.value)}
+                >
+                  {option.label}
                 </button>
               ))}
             </div>
