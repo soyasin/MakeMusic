@@ -1,0 +1,570 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MakeMusic 🎵</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.7.77/Tone.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: #0f0f1a;
+      color: #e0e0ff;
+      min-height: 100vh;
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      padding: 2rem 1rem 4rem;
+    }
+
+    .app { width: 100%; max-width: 680px; }
+
+    header { text-align: center; margin-bottom: 2.4rem; }
+    header h1 {
+      font-size: 2.8rem;
+      background: linear-gradient(135deg, #7c6fff, #ff6fb4);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    header p { color: #9090bb; margin-top: 0.4rem; font-size: 0.95rem; }
+
+    .card {
+      background: #1a1a2e;
+      border-radius: 16px;
+      padding: 1.8rem;
+      margin-bottom: 1.2rem;
+    }
+
+    .control-group { margin-bottom: 1.4rem; }
+    .control-group:last-child { margin-bottom: 0; }
+
+    label.ctrl-label {
+      display: block;
+      font-size: 0.78rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: #8888bb;
+      margin-bottom: 0.6rem;
+    }
+    label.ctrl-label span { color: #7c6fff; font-weight: 700; margin-left: 0.35rem; }
+
+    input[type=range] {
+      width: 100%;
+      accent-color: #7c6fff;
+      cursor: pointer;
+      height: 6px;
+    }
+
+    .btn-group { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+    .btn-group button {
+      background: #252540;
+      border: 1px solid #3a3a60;
+      color: #c0c0e0;
+      border-radius: 8px;
+      padding: 0.42rem 1rem;
+      cursor: pointer;
+      font-size: 0.9rem;
+      transition: background 0.15s, border-color 0.15s, color 0.15s;
+    }
+    .btn-group button:hover { background: #35355a; }
+    .btn-group button.active {
+      background: #7c6fff;
+      border-color: #7c6fff;
+      color: #fff;
+    }
+
+    canvas#wave {
+      display: block;
+      width: 100%;
+      height: 90px;
+      background: #12122000;
+      border-radius: 10px;
+      margin-bottom: 1.2rem;
+    }
+
+    .actions { display: flex; gap: 0.8rem; flex-wrap: wrap; }
+
+    .btn {
+      padding: 0.78rem 1.5rem;
+      border-radius: 10px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      border: none;
+      transition: opacity 0.18s;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+    .btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+    .btn-gen {
+      flex: 1;
+      background: linear-gradient(135deg, #7c6fff, #5b4fe8);
+      color: #fff;
+      justify-content: center;
+    }
+    .btn-gen:not(:disabled):hover { opacity: 0.87; }
+
+    .btn-stop {
+      background: #252540;
+      color: #c0c0e0;
+      border: 1px solid #3a3a60;
+    }
+    .btn-stop:not(:disabled):hover { background: #35355a; }
+
+    .btn-dl {
+      background: linear-gradient(135deg, #ff6fb4, #e040a0);
+      color: #fff;
+    }
+    .btn-dl:not(:disabled):hover { opacity: 0.87; }
+
+    #status-bar {
+      margin-top: 1rem;
+      font-size: 0.88rem;
+      color: #9090bb;
+      min-height: 1.4em;
+    }
+    #status-bar.err { color: #ff6b6b; }
+
+    /* progress bar */
+    .progress-wrap {
+      height: 4px;
+      background: #252540;
+      border-radius: 4px;
+      margin-bottom: 1.2rem;
+      overflow: hidden;
+    }
+    #progress-bar {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, #7c6fff, #ff6fb4);
+      transition: width 0.25s linear;
+      border-radius: 4px;
+    }
+  </style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <h1>🎵 MakeMusic</h1>
+    <p>설정 후 <strong>음악 생성</strong>을 눌러보세요 — 브라우저에서 바로 재생됩니다</p>
+  </header>
+
+  <div class="card">
+    <!-- BPM -->
+    <div class="control-group">
+      <label class="ctrl-label">템포 (BPM)<span id="bpm-val">120</span></label>
+      <input type="range" id="bpm" min="60" max="180" value="120" />
+    </div>
+
+    <!-- Key -->
+    <div class="control-group">
+      <label class="ctrl-label">키 (Key)</label>
+      <div class="btn-group" id="key-group">
+        <button class="active" data-val="C">C</button>
+        <button data-val="D">D</button>
+        <button data-val="E">E</button>
+        <button data-val="F">F</button>
+        <button data-val="G">G</button>
+        <button data-val="A">A</button>
+        <button data-val="B">B</button>
+      </div>
+    </div>
+
+    <!-- Genre -->
+    <div class="control-group">
+      <label class="ctrl-label">장르</label>
+      <div class="btn-group" id="genre-group">
+        <button data-val="Ambient">Ambient</button>
+        <button data-val="Electronic">Electronic</button>
+        <button data-val="Hip-Hop">Hip-Hop</button>
+        <button class="active" data-val="Pop">Pop</button>
+      </div>
+    </div>
+
+    <!-- Bars -->
+    <div class="control-group">
+      <label class="ctrl-label">길이 (마디)</label>
+      <div class="btn-group" id="bars-group">
+        <button data-val="4">4</button>
+        <button class="active" data-val="8">8</button>
+        <button data-val="12">12</button>
+        <button data-val="16">16</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Waveform + progress -->
+  <div class="card" style="padding: 1rem 1.4rem 1rem;">
+    <canvas id="wave" width="640" height="90"></canvas>
+    <div class="progress-wrap"><div id="progress-bar"></div></div>
+    <div class="actions">
+      <button class="btn btn-gen" id="btn-gen">🎵 음악 생성</button>
+      <button class="btn btn-stop" id="btn-stop" disabled>⏹ 정지</button>
+      <a class="btn btn-dl" id="btn-dl" style="display:none">⬇ MIDI 다운로드</a>
+    </div>
+    <div id="status-bar">준비 완료</div>
+  </div>
+</div>
+
+<script>
+// ─── State ──────────────────────────────────────────────────────────────────
+let bpm   = 120;
+let key   = 'C';
+let genre = 'Pop';
+let bars  = 8;
+let playing = false;
+
+// MIDI note roots
+const KEY_MIDI  = { C:60, D:62, E:64, F:65, G:67, A:69, B:71 };
+const SCALE_INT = [0,2,4,5,7,9,11];          // major scale
+const CHORD_DEG = [0,5,7,0];                  // I-IV-V-I (semitones)
+const CHORD_INT = [0,4,7];                    // major chord
+
+// Tone.js objects
+let part       = null;
+let analyser   = null;
+let synthsList = [];
+let animId     = null;
+let stopTimer  = null;
+let transport  = null;
+let progressInterval = null;
+let startTime  = 0;
+let totalDur   = 0;
+
+// ─── DOM refs ────────────────────────────────────────────────────────────────
+const canvas      = document.getElementById('wave');
+const ctx2d       = canvas.getContext('2d');
+const btnGen      = document.getElementById('btn-gen');
+const btnStop     = document.getElementById('btn-stop');
+const btnDl       = document.getElementById('btn-dl');
+const statusBar   = document.getElementById('status-bar');
+const progressBar = document.getElementById('progress-bar');
+
+// ─── Control wiring ──────────────────────────────────────────────────────────
+document.getElementById('bpm').addEventListener('input', e => {
+  bpm = +e.target.value;
+  document.getElementById('bpm-val').textContent = bpm;
+});
+
+function wireGroup(id, cb) {
+  document.getElementById(id).addEventListener('click', e => {
+    const btn = e.target.closest('button');
+    if (!btn) return;
+    document.querySelectorAll(`#${id} button`).forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    cb(btn.dataset.val);
+  });
+}
+wireGroup('key-group',   v => { key   = v; });
+wireGroup('genre-group', v => { genre = v; });
+wireGroup('bars-group',  v => { bars  = +v; });
+
+// ─── Stop all audio ───────────────────────────────────────────────────────────
+function stopAll() {
+  if (part)  { part.dispose(); part = null; }
+  Tone.Transport.stop();
+  Tone.Transport.cancel();
+  if (animId) { cancelAnimationFrame(animId); animId = null; }
+  if (stopTimer) { clearTimeout(stopTimer); stopTimer = null; }
+  if (progressInterval) { clearInterval(progressInterval); progressInterval = null; }
+  synthsList.forEach(s => s.dispose());
+  synthsList = [];
+  if (analyser) { analyser.dispose(); analyser = null; }
+  playing = false;
+  btnGen.disabled  = false;
+  btnStop.disabled = true;
+  progressBar.style.width = '0%';
+  clearCanvas();
+}
+
+function clearCanvas() {
+  ctx2d.clearRect(0, 0, canvas.width, canvas.height);
+  ctx2d.strokeStyle = '#2a2a4a';
+  ctx2d.lineWidth = 1;
+  ctx2d.beginPath();
+  ctx2d.moveTo(0, canvas.height / 2);
+  ctx2d.lineTo(canvas.width, canvas.height / 2);
+  ctx2d.stroke();
+}
+clearCanvas();
+
+// ─── Waveform draw loop ───────────────────────────────────────────────────────
+function drawWave() {
+  if (!analyser) return;
+  const data = analyser.getValue();
+  const w = canvas.width, h = canvas.height;
+  ctx2d.clearRect(0, 0, w, h);
+
+  // background grid line
+  ctx2d.strokeStyle = '#2a2a4a';
+  ctx2d.lineWidth = 1;
+  ctx2d.beginPath();
+  ctx2d.moveTo(0, h / 2);
+  ctx2d.lineTo(w, h / 2);
+  ctx2d.stroke();
+
+  // waveform
+  ctx2d.strokeStyle = '#7c6fff';
+  ctx2d.lineWidth = 2;
+  ctx2d.shadowColor = '#7c6fff';
+  ctx2d.shadowBlur  = 6;
+  ctx2d.beginPath();
+  for (let i = 0; i < data.length; i++) {
+    const x = (i / (data.length - 1)) * w;
+    const y = ((data[i] + 1) / 2) * h;
+    i === 0 ? ctx2d.moveTo(x, y) : ctx2d.lineTo(x, y);
+  }
+  ctx2d.stroke();
+  ctx2d.shadowBlur = 0;
+
+  animId = requestAnimationFrame(drawWave);
+}
+
+// ─── Tone.js MIDI sequence builder ───────────────────────────────────────────
+function buildAndPlay() {
+  Tone.Transport.bpm.value = bpm;
+
+  const rootMidi = KEY_MIDI[key] || 60;
+  const scale    = SCALE_INT.map(i => rootMidi + i);
+
+  // Genre-based synth flavour
+  let oscType = 'triangle';
+  if (genre === 'Electronic') oscType = 'sawtooth';
+  else if (genre === 'Ambient') oscType = 'sine';
+
+  // Chord synth
+  const chordSynth = new Tone.PolySynth(Tone.Synth, {
+    oscillator: { type: oscType },
+    envelope: { attack: genre === 'Ambient' ? 0.4 : 0.05, decay: 0.1, sustain: 0.6, release: genre === 'Ambient' ? 1.5 : 0.5 },
+    volume: -12,
+  }).toDestination();
+
+  // Melody synth
+  const melodySynth = new Tone.Synth({
+    oscillator: { type: 'sine' },
+    envelope: { attack: 0.01, decay: 0.05, sustain: 0.5, release: 0.3 },
+    volume: -10,
+  }).toDestination();
+
+  // Drums (less prominent for Ambient)
+  const drumVol = genre === 'Ambient' ? -30 : -6;
+  const kickSynth = new Tone.MembraneSynth({ volume: drumVol }).toDestination();
+  const snareSynth = new Tone.NoiseSynth({
+    noise: { type: 'white' },
+    envelope: { attack: 0.001, decay: 0.15, sustain: 0, release: 0.05 },
+    volume: drumVol - 4,
+  }).toDestination();
+  const hihatSynth = new Tone.MetalSynth({
+    frequency: 400,
+    envelope: { attack: 0.001, decay: 0.04, release: 0.01 },
+    harmonicity: 5.1,
+    modulationIndex: 32,
+    resonance: 4000,
+    octaves: 1.5,
+    volume: drumVol - 8,
+  }).toDestination();
+
+  // Analyser
+  analyser = new Tone.Analyser('waveform', 256);
+  chordSynth.connect(analyser);
+  melodySynth.connect(analyser);
+
+  synthsList = [chordSynth, melodySynth, kickSynth, snareSynth, hihatSynth];
+
+  // Build events
+  const events = [];
+  for (let bar = 0; bar < bars; bar++) {
+    const degree    = CHORD_DEG[bar % CHORD_DEG.length];
+    const chordRoot = rootMidi + degree;
+    const chordNotes = CHORD_INT.map(i => Tone.Frequency(chordRoot + i, 'midi').toNote());
+
+    const barSec = Tone.Time(`${bar}m`).toSeconds();
+
+    // Chord (whole bar)
+    events.push([barSec, () => chordSynth.triggerAttackRelease(chordNotes, '2n')]);
+
+    for (let beat = 0; beat < 4; beat++) {
+      const beatSec = barSec + Tone.Time(`${beat}n`).toSeconds();
+      const offSec  = beatSec + Tone.Time('8n').toSeconds();
+
+      // Melody
+      const note = Tone.Frequency(scale[Math.floor(Math.random() * scale.length)], 'midi').toNote();
+      events.push([beatSec, () => melodySynth.triggerAttackRelease(note, '8n')]);
+
+      // Hi-hat on beat + offbeat
+      events.push([beatSec, () => hihatSynth.triggerAttackRelease('32n')]);
+      events.push([offSec,  () => hihatSynth.triggerAttackRelease('32n')]);
+
+      // Kick on 1 & 3
+      if (beat === 0 || beat === 2)
+        events.push([beatSec, () => kickSynth.triggerAttackRelease('C1', '8n')]);
+
+      // Snare on 2 & 4
+      if (beat === 1 || beat === 3)
+        events.push([beatSec, () => snareSynth.triggerAttackRelease('8n')]);
+    }
+  }
+
+  part = new Tone.Part((time, fn) => fn(), events);
+  part.start(0);
+
+  Tone.Transport.start();
+  playing = true;
+  btnGen.disabled  = true;
+  btnStop.disabled = false;
+
+  // Progress bar
+  startTime = performance.now();
+  totalDur  = Tone.Time(`${bars}m`).toSeconds() * 1000;
+  progressInterval = setInterval(() => {
+    const pct = Math.min(100, ((performance.now() - startTime) / totalDur) * 100);
+    progressBar.style.width = pct + '%';
+  }, 100);
+
+  // Draw waveform
+  drawWave();
+
+  // Auto-stop
+  stopTimer = setTimeout(() => {
+    stopAll();
+    setStatus('재생 완료 ✅');
+    progressBar.style.width = '100%';
+  }, totalDur + 500);
+}
+
+// ─── MIDI file builder (pure JS) ─────────────────────────────────────────────
+function buildMidi() {
+  const rootMidi   = KEY_MIDI[key] || 60;
+  const scale      = SCALE_INT.map(i => rootMidi + i);
+  const TPB        = 480;
+  const tempo      = Math.round(60_000_000 / bpm); // µs per beat
+
+  function varLen(n) {
+    const out = [];
+    out.push(n & 0x7f);
+    n >>= 7;
+    while (n > 0) { out.unshift((n & 0x7f) | 0x80); n >>= 7; }
+    return out;
+  }
+
+  function trackChunk(events) {
+    // events: array of [deltaTime, ...bytes]
+    const data = [];
+    for (const [dt, ...bytes] of events) {
+      data.push(...varLen(dt), ...bytes);
+    }
+    // end of track
+    data.push(0x00, 0xff, 0x2f, 0x00);
+    const len = data.length;
+    return [
+      0x4d, 0x54, 0x72, 0x6b,   // "MTrk"
+      (len >> 24) & 0xff, (len >> 16) & 0xff, (len >> 8) & 0xff, len & 0xff,
+      ...data,
+    ];
+  }
+
+  // Header chunk
+  const header = [
+    0x4d, 0x54, 0x68, 0x64,  // "MThd"
+    0, 0, 0, 6,               // chunk length = 6
+    0, 1,                     // format 1
+    0, 3,                     // num tracks
+    (TPB >> 8) & 0xff, TPB & 0xff,
+  ];
+
+  // ── Tempo track
+  const tempoTrack = trackChunk([
+    [0, 0xff, 0x51, 0x03, (tempo >> 16) & 0xff, (tempo >> 8) & 0xff, tempo & 0xff],
+  ]);
+
+  // Helper: collect note events
+  function noteEvents(noteList) {
+    // noteList: [{t, note, vel, dur, ch}]
+    const raw = [];
+    noteList.forEach(({ t, note, vel, dur, ch }) => {
+      raw.push([t,       0x90 | ch, note, vel]);
+      raw.push([t + dur, 0x80 | ch, note, 0]);
+    });
+    raw.sort((a, b) => a[0] - b[0]);
+    const evts = [];
+    let prev = 0;
+    raw.forEach(([t, ...bytes]) => {
+      evts.push([t - prev, ...bytes]);
+      prev = t;
+    });
+    return evts;
+  }
+
+  const beat = TPB;
+  const bar  = beat * 4;
+
+  // ── Chord + Melody track
+  const notes = [];
+  for (let b = 0; b < bars; b++) {
+    const degree    = CHORD_DEG[b % CHORD_DEG.length];
+    const chordRoot = rootMidi + degree;
+    // Chord (2 beats)
+    CHORD_INT.forEach(i => {
+      notes.push({ t: b * bar, note: chordRoot + i, vel: 80, dur: beat * 2 - 1, ch: 0 });
+    });
+    // Melody (quarter notes)
+    for (let bt = 0; bt < 4; bt++) {
+      const n = scale[Math.floor(Math.random() * scale.length)];
+      notes.push({ t: b * bar + bt * beat, note: n, vel: 90, dur: beat - 1, ch: 1 });
+    }
+  }
+  const chordMelodyTrack = trackChunk(noteEvents(notes));
+
+  // ── Drum track (channel 9)
+  const drums = [];
+  for (let b = 0; b < bars; b++) {
+    for (let bt = 0; bt < 4; bt++) {
+      const t = b * bar + bt * beat;
+      drums.push({ t,             note: 42, vel: 70, dur: beat / 2 - 1, ch: 9 }); // hi-hat
+      drums.push({ t: t + beat/2, note: 42, vel: 60, dur: beat / 2 - 1, ch: 9 }); // off hi-hat
+      if (bt === 0 || bt === 2) drums.push({ t, note: 36, vel: 100, dur: beat - 1, ch: 9 }); // kick
+      if (bt === 1 || bt === 3) drums.push({ t, note: 38, vel: 90,  dur: beat - 1, ch: 9 }); // snare
+    }
+  }
+  const drumTrack = trackChunk(noteEvents(drums));
+
+  const bytes = new Uint8Array([...header, ...tempoTrack, ...chordMelodyTrack, ...drumTrack]);
+  return bytes;
+}
+
+// ─── Buttons ─────────────────────────────────────────────────────────────────
+function setStatus(msg, err = false) {
+  statusBar.textContent = msg;
+  statusBar.className   = err ? 'err' : '';
+}
+
+btnGen.addEventListener('click', async () => {
+  stopAll();
+  await Tone.start();
+  setStatus('생성 중… 🎶');
+
+  // Build MIDI for download first
+  const midiBytes = buildMidi();
+  const blob = new Blob([midiBytes], { type: 'audio/midi' });
+  const url  = URL.createObjectURL(blob);
+  btnDl.href     = url;
+  btnDl.download = `makemusic_${key}_${bpm}bpm.mid`;
+  btnDl.style.display = 'inline-flex';
+
+  buildAndPlay();
+  setStatus(`재생 중 ▶  |  키: ${key}  BPM: ${bpm}  장르: ${genre}  ${bars}마디`);
+});
+
+btnStop.addEventListener('click', () => {
+  stopAll();
+  setStatus('정지됨');
+});
+</script>
+</body>
+</html>

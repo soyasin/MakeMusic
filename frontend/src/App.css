@@ -1,0 +1,143 @@
+.app {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 2rem 1rem;
+}
+
+header {
+  text-align: center;
+  margin-bottom: 2.5rem;
+}
+
+header h1 {
+  font-size: 2.8rem;
+  background: linear-gradient(135deg, #7c6fff, #ff6fb4);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+header p {
+  color: #9090bb;
+  margin-top: 0.4rem;
+}
+
+.controls {
+  background: #1a1a2e;
+  border-radius: 16px;
+  padding: 1.8rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.4rem;
+  margin-bottom: 1.5rem;
+}
+
+.control-group label {
+  display: block;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #9090bb;
+  margin-bottom: 0.6rem;
+}
+
+.control-group label .val {
+  color: #7c6fff;
+  font-weight: 700;
+  margin-left: 0.4rem;
+}
+
+input[type='range'] {
+  width: 100%;
+  accent-color: #7c6fff;
+  height: 6px;
+  cursor: pointer;
+}
+
+.btn-group {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.btn-group button {
+  background: #252540;
+  border: 1px solid #3a3a60;
+  color: #c0c0e0;
+  border-radius: 8px;
+  padding: 0.4rem 0.9rem;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: all 0.15s;
+}
+
+.btn-group button:hover {
+  background: #35355a;
+}
+
+.btn-group button.active {
+  background: #7c6fff;
+  border-color: #7c6fff;
+  color: #fff;
+}
+
+.waveform {
+  display: block;
+  width: 100%;
+  height: 100px;
+  background: #1a1a2e;
+  border-radius: 12px;
+  margin-bottom: 1.5rem;
+}
+
+.actions {
+  display: flex;
+  gap: 0.9rem;
+  flex-wrap: wrap;
+}
+
+.btn-generate, .btn-play, .btn-download {
+  padding: 0.75rem 1.6rem;
+  border-radius: 10px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+  transition: all 0.2s;
+  text-decoration: none;
+}
+
+.btn-generate {
+  background: linear-gradient(135deg, #7c6fff, #5b4fe8);
+  color: #fff;
+  flex: 1;
+}
+
+.btn-generate:hover:not(:disabled) { opacity: 0.88; }
+.btn-generate:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.btn-play {
+  background: #252540;
+  color: #c0c0e0;
+  border: 1px solid #3a3a60;
+}
+
+.btn-play:hover:not(:disabled) { background: #35355a; }
+.btn-play:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.btn-download {
+  background: linear-gradient(135deg, #ff6fb4, #e040a0);
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+}
+
+.btn-download:hover { opacity: 0.88; }
+
+.error-msg {
+  margin-top: 1rem;
+  color: #ff6b6b;
+  background: #2a1a1a;
+  padding: 0.8rem 1.2rem;
+  border-radius: 8px;
+}
