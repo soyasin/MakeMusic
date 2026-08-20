@@ -100,11 +100,9 @@ def generate_midi(
     scale_intervals = MINOR_SCALE if dark_tone else MAJOR_SCALE
     chord_progression = GAME_OST_PROGRESSION if dark_tone else CHORD_PROGRESSION
     chord_intervals = MINOR_CHORD if dark_tone else MAJOR_CHORD
-    scale = [root + i for i in scale_intervals]
     chord_velocity = {'soft': 60, 'normal': 80, 'strong': 96}.get(dynamics, 80)
 
     chord_events = []
-    beats_per_chord = 4  # one chord per bar (4/4)
     for bar in range(bars):
         semitone_offset = chord_progression[bar % len(chord_progression)]
         chord_root = root + semitone_offset

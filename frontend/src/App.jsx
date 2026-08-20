@@ -33,7 +33,6 @@ const MINOR_CHORD   = [0, 3, 7];
 const MAJOR_SCALE   = [0, 2, 4, 5, 7, 9, 11];
 const MINOR_SCALE   = [0, 2, 3, 5, 7, 8, 10];
 
-// Note name -> MIDI-style number helper
 const NOTE_MIDI = { C: 60, D: 62, E: 64, F: 65, G: 67, A: 69, B: 71 };
 const GAME_PRESETS = [
   {
@@ -55,10 +54,6 @@ const GAME_PRESETS = [
     settings: { bpm: 92, key: 'C', genre: 'Game OST', lengthMode: 'loop', mood: 'bright', complexity: 'simple', dynamics: 'soft' },
   },
 ];
-
-function midiToFreq(midi) {
-  return 440 * Math.pow(2, (midi - 69) / 12);
-}
 
 function getEffectiveBpm(genre, bpm) {
   return genre === 'Game OST' ? Math.max(80, Math.min(100, bpm)) : bpm;
