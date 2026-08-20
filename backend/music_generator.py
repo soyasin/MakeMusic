@@ -30,7 +30,7 @@ def _bars_from_length_mode(length_mode: str) -> int:
     if length_mode == '3min':
         return 90
     if length_mode == 'loop':
-        return 100
+        return 16
     return 30
 
 
@@ -123,6 +123,31 @@ def generate_midi(
         chord_track.append(Message(kind, channel=ch, note=note, velocity=vel, time=delta))
         prev = t
     chord_track.append(MetaMessage('end_of_track', time=0))
+
+    # ---- Bass track ----
+    bass_track = MidiTrack()
+    mid.tracks.append(bass_track)
+    bass_track.append(MetaMessage('track_name', name='Bass', time=0))
+
+    bass_events = []
+    bass_velocity = {'soft': 56, 'normal': 72, 'strong': 88}.get(dynamics, 72)
+    for bar in range(bars):
+        semitone_offset = chord_progression[bar % len(chord_progression)]
+        bass_root = root + semitone_offset - 12
+        for beat_num in [0, 2]:
+            t_on = bar * beat * 4 + beat_num * beat
+            t_off = t_on + eighth - 1
+            bass_events.append((t_on, 'note_on', 2, bass_root, bass_velocity))
+            bass_events.append((t_off, 'note_off', 2, bass_root, 0))
+
+    bass_events.sort(key=lambda x: x[0])
+    prev = 0
+    for ev in bass_events:
+        t, kind, ch, note, vel = ev
+        delta = t - prev
+        bass_track.append(Message(kind, channel=ch, note=note, velocity=vel, time=delta))
+        prev = t
+    bass_track.append(MetaMessage('end_of_track', time=0))
 
     # ---- Melody track ----
     melody_track = MidiTrack()

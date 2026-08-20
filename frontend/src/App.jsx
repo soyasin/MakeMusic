@@ -5,9 +5,9 @@ import './App.css';
 const KEYS    = ['C', 'D', 'E', 'F', 'G', 'A', 'B'];
 const GENRES  = ['Ambient', 'Electronic', 'Hip-Hop', 'Pop', 'Game OST'];
 const LENGTH_MODES = [
-  { value: '1min', label: '1분', bars: 30, approx: '약 30초 재생', isLoop: false },
-  { value: '3min', label: '3분', bars: 90, approx: '약 1.5분 재생', isLoop: false },
-  { value: 'loop', label: '루프형', bars: 100, approx: '무한 반복', isLoop: true },
+  { value: '1min', label: '1분', bars: 30, approx: '완성도 확인용 긴 구조', isLoop: false },
+  { value: '3min', label: '3분', bars: 90, approx: '확장 편곡용', isLoop: false },
+  { value: 'loop', label: '루프형', bars: 16, approx: '16마디 반복', isLoop: true },
 ];
 const MOODS = [
   { value: 'bright', label: '밝음' },
@@ -35,23 +35,52 @@ const MINOR_SCALE   = [0, 2, 3, 5, 7, 8, 10];
 
 // Note name -> MIDI-style number helper
 const NOTE_MIDI = { C: 60, D: 62, E: 64, F: 65, G: 67, A: 69, B: 71 };
+const GAME_PRESETS = [
+  {
+    id: 'field',
+    label: '필드',
+    description: '탐험/던전용 차분한 루프',
+    settings: { bpm: 88, key: 'A', genre: 'Game OST', lengthMode: 'loop', mood: 'mysterious', complexity: 'simple', dynamics: 'normal' },
+  },
+  {
+    id: 'battle',
+    label: '전투',
+    description: '더 빠르고 밀도 있는 루프',
+    settings: { bpm: 100, key: 'E', genre: 'Game OST', lengthMode: 'loop', mood: 'dark', complexity: 'complex', dynamics: 'strong' },
+  },
+  {
+    id: 'town',
+    label: '메뉴/마을',
+    description: '밝고 단순한 반복 훅',
+    settings: { bpm: 92, key: 'C', genre: 'Game OST', lengthMode: 'loop', mood: 'bright', complexity: 'simple', dynamics: 'soft' },
+  },
+];
 
 function midiToFreq(midi) {
   return 440 * Math.pow(2, (midi - 69) / 12);
 }
 
+function getEffectiveBpm(genre, bpm) {
+  return genre === 'Game OST' ? Math.max(80, Math.min(100, bpm)) : bpm;
+}
+
+function getDownloadName(res, fallback) {
+  const disposition = res.headers.get('Content-Disposition') || '';
+  const match = disposition.match(/filename="?([^"]+)"?/);
+  return match?.[1] || fallback;
+}
+
 export default function App() {
-  const [bpm,     setBpm]     = useState(120);
-  const [key,     setKey]     = useState('C');
-  const [genre,   setGenre]   = useState('Pop');
-  const [lengthMode, setLengthMode] = useState('1min');
-  const [mood, setMood] = useState('bright');
-  const [complexity, setComplexity] = useState('normal');
+  const [bpm,     setBpm]     = useState(88);
+  const [key,     setKey]     = useState('A');
+  const [genre,   setGenre]   = useState('Game OST');
+  const [lengthMode, setLengthMode] = useState('loop');
+  const [mood, setMood] = useState('mysterious');
+  const [complexity, setComplexity] = useState('simple');
   const [dynamics, setDynamics] = useState('normal');
   const [status,  setStatus]  = useState('idle'); // idle | generating | playing | error
   const [midiUrl, setMidiUrl] = useState(null);
   const [midiName, setMidiName] = useState('');
-  const [waveData, setWaveData] = useState([]);
 
   const partRef   = useRef(null);
   const analyserRef = useRef(null);
@@ -80,6 +109,19 @@ export default function App() {
 
   useEffect(() => () => stopPlayback(), [stopPlayback]);
 
+  const effectiveBpm = getEffectiveBpm(genre, bpm);
+  const activePreset = GAME_PRESETS.find((preset) => (
+    Object.entries(preset.settings).every(([settingKey, value]) => ({
+      bpm,
+      key,
+      genre,
+      lengthMode,
+      mood,
+      complexity,
+      dynamics,
+    }[settingKey] === value))
+  ))?.id;
+
   // Draw waveform from analyser
   const drawWave = useCallback(() => {
     if (!canvasRef.current || !analyserRef.current) return;
@@ -105,7 +147,6 @@ export default function App() {
     await Tone.start();
     stopPlayback();
 
-    const effectiveBpm = genre === 'Game OST' ? Math.max(80, Math.min(100, bpm)) : bpm;
     Tone.getTransport().bpm.value = effectiveBpm;
     const transport = Tone.getTransport();
     const selectedLength = LENGTH_MODES.find((m) => m.value === lengthMode) || LENGTH_MODES[0];
@@ -121,15 +162,23 @@ export default function App() {
 
     // Synths
     const chordSynth = new Tone.PolySynth(Tone.Synth, {
-      oscillator: { type: mood === 'mysterious' ? 'sine' : 'triangle' },
-      envelope: { attack: mood === 'mysterious' ? 0.2 : 0.05, decay: 0.1, sustain: 0.6, release: mood === 'mysterious' ? 1.2 : 0.5 },
-      volume: -10,
+      oscillator: { type: isDarkTone ? 'square' : 'triangle' },
+      envelope: { attack: 0.01, decay: 0.08, sustain: 0.45, release: 0.15 },
+      volume: -12,
     }).toDestination();
 
     const melodySynth = new Tone.Synth({
-      oscillator: { type: mood === 'bright' ? 'triangle' : 'sine' },
-      envelope: { attack: mood === 'mysterious' ? 0.08 : 0.01, decay: 0.05, sustain: 0.5, release: mood === 'mysterious' ? 0.8 : 0.3 },
+      oscillator: { type: mood === 'bright' ? 'square' : 'triangle' },
+      envelope: { attack: 0.005, decay: 0.05, sustain: 0.35, release: 0.08 },
       volume: dynamicMap[dynamics] ?? -8,
+    }).toDestination();
+
+    const bassSynth = new Tone.MonoSynth({
+      oscillator: { type: 'square' },
+      filter: { Q: 1, type: 'lowpass', rolloff: -12 },
+      envelope: { attack: 0.005, decay: 0.12, sustain: 0.3, release: 0.08 },
+      filterEnvelope: { attack: 0.001, decay: 0.08, sustain: 0.2, release: 0.05, baseFrequency: 120, octaves: 2 },
+      volume: -10,
     }).toDestination();
 
     const drumVolMap = { soft: -16, normal: -9, strong: -4 };
@@ -153,11 +202,15 @@ export default function App() {
     analyserRef.current = new Tone.Analyser('waveform', 256);
     chordSynth.connect(analyserRef.current);
     melodySynth.connect(analyserRef.current);
+    bassSynth.connect(analyserRef.current);
 
     // Track synths for cleanup
-    synthsRef.current = [chordSynth, melodySynth, kickSynth, snareSynth, hihatSynth];
+    synthsRef.current = [chordSynth, melodySynth, bassSynth, kickSynth, snareSynth, hihatSynth];
 
     const seqEvents = [];
+    const hookPattern = [0, 3, 5, 3];
+    const quarter = Tone.Time('4n').toSeconds();
+    const eighth = Tone.Time('8n').toSeconds();
 
     for (let bar = 0; bar < bars; bar++) {
       const degree    = chordDegrees[bar % chordDegrees.length];
@@ -170,19 +223,30 @@ export default function App() {
       seqEvents.push({ time: barTime, fn: () => chordSynth.triggerAttackRelease(chordNotes, '2n') });
 
       // Melody density by complexity
-      const notesPerBar = complexity === 'simple' ? 2 : complexity === 'complex' ? 8 : 4;
+      const notesPerBar = (genre === 'Game OST' || mood === 'mysterious')
+        ? (complexity === 'complex' ? 8 : 4)
+        : complexity === 'simple' ? 2 : complexity === 'complex' ? 8 : 4;
       const noteUnit = notesPerBar === 2 ? '2n' : notesPerBar === 8 ? '16n' : '4n';
       const stepDuration = (Tone.Time('1m').toSeconds()) / notesPerBar;
       for (let step = 0; step < notesPerBar; step++) {
-        const noteIdx  = Math.floor(Math.random() * scale.length);
-        const noteFreq = Tone.Frequency(scale[noteIdx], 'midi').toNote();
+        const noteMidi = (genre === 'Game OST' || mood === 'mysterious')
+          ? chordRoot + hookPattern[step % hookPattern.length]
+          : scale[Math.floor(Math.random() * scale.length)];
+        const noteFreq = Tone.Frequency(noteMidi, 'midi').toNote();
         const stepTime = Tone.Time(`${bar}m`).toSeconds() + step * stepDuration;
         seqEvents.push({ time: stepTime, fn: () => melodySynth.triggerAttackRelease(noteFreq, noteUnit) });
       }
 
+      // Bass on root notes
+      [0, 2].forEach((beatIndex) => {
+        const bassTime = Tone.Time(`${bar}m`).toSeconds() + beatIndex * quarter;
+        const bassNote = Tone.Frequency(chordRoot - 12, 'midi').toNote();
+        seqEvents.push({ time: bassTime, fn: () => bassSynth.triggerAttackRelease(bassNote, '8n') });
+      });
+
       // Drums per beat
       for (let beat = 0; beat < 4; beat++) {
-        const tSec = Tone.Time(`${bar}m`).toSeconds() + Tone.Time(`${beat}n`).toSeconds();
+        const tSec = Tone.Time(`${bar}m`).toSeconds() + beat * quarter;
         // hi-hat every beat (skip some in soft mode)
         if (!(dynamics === 'soft' && beat === 3)) {
           seqEvents.push({ time: tSec, fn: () => hihatSynth.triggerAttackRelease('32n') });
@@ -193,7 +257,7 @@ export default function App() {
         if (beat === 1 || beat === 3) seqEvents.push({ time: tSec, fn: () => snareSynth.triggerAttackRelease('8n') });
         // 8th note hi-hat (offbeat)
         if (complexity !== 'simple') {
-          const offSec = tSec + Tone.Time('8n').toSeconds();
+          const offSec = tSec + eighth;
           seqEvents.push({ time: offSec, fn: () => hihatSynth.triggerAttackRelease('32n') });
         }
       }
@@ -223,7 +287,17 @@ export default function App() {
       const totalSecs = Tone.Time(`${bars}m`).toSeconds();
       setTimeout(() => stopPlayback(), (totalSecs + 1) * 1000);
     }
-  }, [bpm, key, genre, lengthMode, mood, complexity, dynamics, stopPlayback, drawWave]);
+  }, [effectiveBpm, key, genre, lengthMode, mood, complexity, dynamics, stopPlayback, drawWave]);
+
+  const applyPreset = (preset) => {
+    setBpm(preset.settings.bpm);
+    setKey(preset.settings.key);
+    setGenre(preset.settings.genre);
+    setLengthMode(preset.settings.lengthMode);
+    setMood(preset.settings.mood);
+    setComplexity(preset.settings.complexity);
+    setDynamics(preset.settings.dynamics);
+  };
 
   const handleGenerate = async () => {
     setStatus('generating');
@@ -237,7 +311,7 @@ export default function App() {
       if (!res.ok) throw new Error('서버 오류');
       const blob = await res.blob();
       const url  = URL.createObjectURL(blob);
-      const name = `music_${key}_${bpm}bpm.mid`;
+      const name = getDownloadName(res, `music_${key}_${effectiveBpm}bpm.mid`);
       setMidiUrl(url);
       setMidiName(name);
       setStatus('idle');
@@ -257,18 +331,50 @@ export default function App() {
     <div className="app">
       <header>
         <h1>🎵 MakeMusic</h1>
-        <p>AI 음악 생성기 — 설정 후 생성하세요</p>
+        <p>16비트 게임 음악 스케치용 MIDI 생성기 — 루프를 만든 뒤 DAW에서 음색을 입히세요</p>
       </header>
 
       <main>
+        <section className="workflow-card">
+          <h2>게임 음악 작업 흐름</h2>
+          <ul>
+            <li>먼저 루프형 MIDI로 필드/전투/메뉴용 짧은 시안을 만듭니다.</li>
+            <li>MakeMusic은 구조 스케치용이고, 최종 16비트 질감은 Ableton 같은 DAW에서 만듭니다.</li>
+            <li>내려받은 MIDI는 드럼/코드/베이스/멜로디 트랙으로 분리되어 리메이크하기 쉽습니다.</li>
+          </ul>
+        </section>
+
+        <section className="preset-section">
+          <div className="section-heading">
+            <h2>빠른 시작 프리셋</h2>
+            <p>게임 용도에 맞는 루프 설정을 바로 불러옵니다.</p>
+          </div>
+          <div className="preset-grid">
+            {GAME_PRESETS.map((preset) => (
+              <button
+                key={preset.id}
+                type="button"
+                className={`preset-card ${activePreset === preset.id ? 'active' : ''}`}
+                onClick={() => applyPreset(preset)}
+              >
+                <strong>{preset.label}</strong>
+                <span>{preset.description}</span>
+              </button>
+            ))}
+          </div>
+        </section>
+
         <section className="controls">
           {/* BPM */}
           <div className="control-group">
-            <label>템포 (BPM) <span className="val">{bpm}</span></label>
+            <label>템포 (BPM) <span className="val">{effectiveBpm}</span></label>
             <input
               type="range" min={60} max={180} value={bpm}
               onChange={e => setBpm(Number(e.target.value))}
             />
+            {genre === 'Game OST' && (
+              <p className="helper-text">Game OST는 80–100 BPM으로 자동 정리되어 차분한 게임 루프 제작에 맞춰집니다.</p>
+            )}
           </div>
 
           {/* Key */}
@@ -305,6 +411,7 @@ export default function App() {
                 </button>
               ))}
             </div>
+            <p className="helper-text">게임 삽입용 첫 시안은 루프형부터 만들고, 마음에 드는 아이디어만 긴 구조로 확장하세요.</p>
           </div>
 
           <div className="control-group">
@@ -380,6 +487,15 @@ export default function App() {
             </a>
           )}
         </div>
+
+        <section className="export-card">
+          <h2>내보낸 뒤 이렇게 진행하세요</h2>
+          <ol>
+            <li>MIDI를 Ableton Live로 가져옵니다.</li>
+            <li>멜로디는 square/triangle 계열, 베이스는 단순 루트음, 드럼은 노이즈 계열로 교체합니다.</li>
+            <li>루프가 자연스럽게 이어지면 WAV/OGG로 렌더링해 게임에 넣습니다.</li>
+          </ol>
+        </section>
 
         {status === 'error' && (
           <p className="error-msg">⚠ 백엔드 연결 오류 — 서버가 실행 중인지 확인하세요.</p>
