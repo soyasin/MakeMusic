@@ -19,15 +19,27 @@ def generate():
     bpm   = int(data.get('bpm', 120))
     key   = data.get('key', 'C')
     genre = data.get('genre', 'Pop')
-    bars  = int(data.get('bars', 8))
+    length_mode = data.get('length_mode', '1min')
+    mood = data.get('mood', 'bright')
+    complexity = data.get('complexity', 'normal')
+    dynamics = data.get('dynamics', 'normal')
 
     # Clamp values
     bpm  = max(60, min(180, bpm))
-    bars = max(4, min(16, bars))
     if key not in ('C', 'D', 'E', 'F', 'G', 'A', 'B'):
         key = 'C'
+    if genre not in ('Ambient', 'Electronic', 'Hip-Hop', 'Pop', 'Game OST'):
+        genre = 'Pop'
+    if length_mode not in ('1min', '3min', 'loop'):
+        length_mode = '1min'
+    if mood not in ('bright', 'dark', 'mysterious'):
+        mood = 'bright'
+    if complexity not in ('simple', 'normal', 'complex'):
+        complexity = 'normal'
+    if dynamics not in ('soft', 'normal', 'strong'):
+        dynamics = 'normal'
 
-    midi_bytes = generate_midi(bpm, key, genre, bars)
+    midi_bytes = generate_midi(bpm, key, genre, length_mode, mood, complexity, dynamics)
 
     return send_file(
         io.BytesIO(midi_bytes),
