@@ -3,10 +3,10 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>MakeMusic 🎵</title>
+  <title>MakeMusic 🎵 - 게임 음악 생성기</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.7.77/Tone.js"></script>
   <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
 
     body {
       font-family: 'Segoe UI', system-ui, sans-serif;
@@ -19,7 +19,7 @@
       padding: 2rem 1rem 4rem;
     }
 
-    .app { width: 100%; max-width: 680px; }
+    .app { width: 100%; max-width: 720px; }
 
     header { text-align: center; margin-bottom: 2.4rem; }
     header h1 {
@@ -28,8 +28,9 @@
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
       background-clip: text;
+      margin-bottom: 0.4rem;
     }
-    header p { color: #9090bb; margin-top: 0.4rem; font-size: 0.95rem; }
+    header p { color: #9090bb; font-size: 0.95rem; }
 
     .card {
       background: #1a1a2e;
@@ -38,18 +39,85 @@
       margin-bottom: 1.2rem;
     }
 
+    .card h2 {
+      font-size: 1.1rem;
+      margin-bottom: 1.2rem;
+      color: #c0c0e0;
+    }
+
+    .workflow-list {
+      list-style: none;
+      color: #9090bb;
+      line-height: 1.6;
+    }
+    .workflow-list li {
+      margin-bottom: 0.6rem;
+      padding-left: 1.4rem;
+      position: relative;
+    }
+    .workflow-list li:before {
+      content: "→";
+      position: absolute;
+      left: 0;
+      color: #7c6fff;
+      font-weight: bold;
+    }
+
+    .preset-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 1rem;
+      margin-bottom: 1.2rem;
+    }
+
+    .preset-card {
+      background: #252540;
+      border: 2px solid #3a3a60;
+      border-radius: 12px;
+      padding: 1.2rem;
+      cursor: pointer;
+      transition: all 0.2s;
+      text-align: left;
+      color: #9090bb;
+    }
+    .preset-card:hover {
+      border-color: #7c6fff;
+      background: #2a2a45;
+    }
+    .preset-card.active {
+      background: #7c6fff;
+      border-color: #7c6fff;
+      color: #fff;
+    }
+    .preset-card strong {
+      display: block;
+      font-size: 1.05rem;
+      margin-bottom: 0.3rem;
+      color: inherit;
+    }
+    .preset-card span {
+      font-size: 0.85rem;
+      opacity: 0.9;
+    }
+
     .control-group { margin-bottom: 1.4rem; }
     .control-group:last-child { margin-bottom: 0; }
 
-    label.ctrl-label {
-      display: block;
-      font-size: 0.78rem;
+    label {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.9rem;
       text-transform: uppercase;
       letter-spacing: 0.08em;
       color: #8888bb;
       margin-bottom: 0.6rem;
     }
-    label.ctrl-label span { color: #7c6fff; font-weight: 700; margin-left: 0.35rem; }
+    .val {
+      color: #7c6fff;
+      font-weight: 700;
+      font-size: 1rem;
+    }
 
     input[type=range] {
       width: 100%;
@@ -58,16 +126,20 @@
       height: 6px;
     }
 
-    .btn-group { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+    .btn-group {
+      display: flex;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+    }
     .btn-group button {
       background: #252540;
       border: 1px solid #3a3a60;
       color: #c0c0e0;
       border-radius: 8px;
-      padding: 0.42rem 1rem;
+      padding: 0.42rem 0.8rem;
       cursor: pointer;
-      font-size: 0.9rem;
-      transition: background 0.15s, border-color 0.15s, color 0.15s;
+      font-size: 0.85rem;
+      transition: all 0.15s;
     }
     .btn-group button:hover { background: #35355a; }
     .btn-group button.active {
@@ -76,7 +148,13 @@
       color: #fff;
     }
 
-    canvas#wave {
+    .helper-text {
+      font-size: 0.78rem;
+      color: #6060aa;
+      margin-top: 0.4rem;
+    }
+
+    canvas.waveform {
       display: block;
       width: 100%;
       height: 90px;
@@ -85,7 +163,27 @@
       margin-bottom: 1.2rem;
     }
 
-    .actions { display: flex; gap: 0.8rem; flex-wrap: wrap; }
+    .progress-wrap {
+      height: 4px;
+      background: #252540;
+      border-radius: 4px;
+      margin-bottom: 1.2rem;
+      overflow: hidden;
+    }
+    .progress-bar {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, #7c6fff, #ff6fb4);
+      transition: width 0.25s linear;
+      border-radius: 4px;
+    }
+
+    .actions {
+      display: flex;
+      gap: 0.8rem;
+      flex-wrap: wrap;
+      margin-bottom: 1.2rem;
+    }
 
     .btn {
       padding: 0.78rem 1.5rem;
@@ -99,29 +197,32 @@
       display: inline-flex;
       align-items: center;
       gap: 0.4rem;
+      justify-content: center;
     }
     .btn:disabled { opacity: 0.45; cursor: not-allowed; }
 
-    .btn-gen {
+    .btn-generate {
       flex: 1;
+      min-width: 140px;
       background: linear-gradient(135deg, #7c6fff, #5b4fe8);
       color: #fff;
-      justify-content: center;
     }
-    .btn-gen:not(:disabled):hover { opacity: 0.87; }
+    .btn-generate:not(:disabled):hover { opacity: 0.87; }
 
-    .btn-stop {
+    .btn-play {
       background: #252540;
       color: #c0c0e0;
       border: 1px solid #3a3a60;
+      min-width: 100px;
     }
-    .btn-stop:not(:disabled):hover { background: #35355a; }
+    .btn-play:not(:disabled):hover { background: #35355a; }
 
-    .btn-dl {
+    .btn-download {
       background: linear-gradient(135deg, #ff6fb4, #e040a0);
       color: #fff;
+      min-width: 140px;
     }
-    .btn-dl:not(:disabled):hover { opacity: 0.87; }
+    .btn-download:not(:disabled):hover { opacity: 0.87; }
 
     #status-bar {
       margin-top: 1rem;
@@ -131,20 +232,49 @@
     }
     #status-bar.err { color: #ff6b6b; }
 
-    /* progress bar */
-    .progress-wrap {
-      height: 4px;
-      background: #252540;
-      border-radius: 4px;
-      margin-bottom: 1.2rem;
-      overflow: hidden;
+    .error-msg {
+      background: rgba(255, 107, 107, 0.1);
+      border-left: 3px solid #ff6b6b;
+      color: #ff6b6b;
+      padding: 0.8rem 1rem;
+      border-radius: 6px;
+      margin-top: 1rem;
     }
-    #progress-bar {
-      height: 100%;
-      width: 0%;
-      background: linear-gradient(90deg, #7c6fff, #ff6fb4);
-      transition: width 0.25s linear;
-      border-radius: 4px;
+
+    .export-card ol {
+      counter-reset: section;
+      list-style: none;
+      color: #9090bb;
+      line-height: 1.7;
+    }
+    .export-card li {
+      margin-bottom: 0.8rem;
+      padding-left: 2.2rem;
+      position: relative;
+      counter-increment: section;
+    }
+    .export-card li:before {
+      content: counter(section);
+      position: absolute;
+      left: 0;
+      width: 1.8rem;
+      height: 1.8rem;
+      background: #7c6fff;
+      color: #fff;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+      font-size: 0.85rem;
+    }
+
+    @media (max-width: 600px) {
+      header h1 { font-size: 2rem; }
+      .card { padding: 1.2rem; }
+      .preset-grid { grid-template-columns: 1fr; }
+      .actions { flex-direction: column; }
+      .btn { width: 100%; }
     }
   </style>
 </head>
@@ -152,19 +282,51 @@
 <div class="app">
   <header>
     <h1>🎵 MakeMusic</h1>
-    <p>설정 후 <strong>음악 생성</strong>을 눌러보세요 — 브라우저에서 바로 재생됩니다</p>
+    <p>16비트 게임 음악 스케치 생성기 — 브라우저에서 즉시 MIDI를 만드세요</p>
   </header>
 
+  <!-- 작업 흐름 설명 -->
+  <div class="card">
+    <h2>게임 음악 작업 흐름</h2>
+    <ul class="workflow-list">
+      <li>먼저 루프형 MIDI로 필드/전투/메뉴용 짧은 시안을 만듭니다.</li>
+      <li>MakeMusic은 구조 스케치용이고, 최종 16비트 음색은 DAW에서 만듭니다.</li>
+      <li>내려받은 MIDI는 드럼/코드/베이스/멜로디 트랙으로 분리되어 리메이크하기 쉽습니다.</li>
+    </ul>
+  </div>
+
+  <!-- 프리셋 -->
+  <div class="card">
+    <h2>빠른 시작 프리셋</h2>
+    <p style="color: #6060aa; font-size: 0.9rem; margin-bottom: 1rem;">게임 용도에 맞는 루프 설정을 바로 불러옵니다.</p>
+    <div class="preset-grid">
+      <button class="preset-card" data-preset="field">
+        <strong>🏞️ 필드</strong>
+        <span>탐험/던전용 차분한 루프</span>
+      </button>
+      <button class="preset-card" data-preset="battle">
+        <strong>⚔️ 전투</strong>
+        <span>더 빠르고 밀도 있는 루프</span>
+      </button>
+      <button class="preset-card" data-preset="town">
+        <strong>🏘️ 메뉴/마을</strong>
+        <span>밝고 단순한 반복 훅</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- 컨트롤 -->
   <div class="card">
     <!-- BPM -->
     <div class="control-group">
-      <label class="ctrl-label">템포 (BPM)<span id="bpm-val">120</span></label>
-      <input type="range" id="bpm" min="60" max="180" value="120" />
+      <label>템포 (BPM)<span class="val" id="bpm-val">88</span></label>
+      <input type="range" id="bpm" min="60" max="180" value="88" />
+      <p class="helper-text" id="bpm-note">Game OST는 80–100 BPM으로 자동 정리되어 차분한 게임 루프 제작에 맞춰집니다.</p>
     </div>
 
-    <!-- Key -->
+    <!-- 키 -->
     <div class="control-group">
-      <label class="ctrl-label">키 (Key)</label>
+      <label>키 (Key)</label>
       <div class="btn-group" id="key-group">
         <button class="active" data-val="C">C</button>
         <button data-val="D">D</button>
@@ -176,109 +338,240 @@
       </div>
     </div>
 
-    <!-- Genre -->
+    <!-- 장르 -->
     <div class="control-group">
-      <label class="ctrl-label">장르</label>
+      <label>장르</label>
       <div class="btn-group" id="genre-group">
         <button data-val="Ambient">Ambient</button>
         <button data-val="Electronic">Electronic</button>
         <button data-val="Hip-Hop">Hip-Hop</button>
-        <button class="active" data-val="Pop">Pop</button>
+        <button data-val="Pop">Pop</button>
+        <button class="active" data-val="Game OST">Game OST</button>
       </div>
     </div>
 
-    <!-- Bars -->
+    <!-- 길이 -->
     <div class="control-group">
-      <label class="ctrl-label">길이 (마디)</label>
-      <div class="btn-group" id="bars-group">
-        <button data-val="4">4</button>
-        <button class="active" data-val="8">8</button>
-        <button data-val="12">12</button>
-        <button data-val="16">16</button>
+      <label>길이</label>
+      <div class="btn-group" id="length-group">
+        <button class="active" data-val="loop">루프형 (16마디)</button>
+        <button data-val="1min">1분</button>
+        <button data-val="3min">3분</button>
+      </div>
+      <p class="helper-text">게임 삽입용 첫 시안은 루프형부터 만들고, 마음에 드는 아이디어만 긴 구조로 확장하세요.</p>
+    </div>
+
+    <!-- 무드 -->
+    <div class="control-group">
+      <label>무드</label>
+      <div class="btn-group" id="mood-group">
+        <button data-val="bright">밝음</button>
+        <button class="active" data-val="mysterious">신비로움</button>
+        <button data-val="dark">어두움</button>
+      </div>
+    </div>
+
+    <!-- 리듬 복잡도 -->
+    <div class="control-group">
+      <label>리듬 복잡도</label>
+      <div class="btn-group" id="complexity-group">
+        <button class="active" data-val="simple">심플</button>
+        <button data-val="normal">보통</button>
+        <button data-val="complex">복잡</button>
+      </div>
+    </div>
+
+    <!-- 다이내믹 -->
+    <div class="control-group">
+      <label>다이내믹</label>
+      <div class="btn-group" id="dynamics-group">
+        <button data-val="soft">부드럽게</button>
+        <button class="active" data-val="normal">보통</button>
+        <button data-val="strong">강하게</button>
       </div>
     </div>
   </div>
 
-  <!-- Waveform + progress -->
-  <div class="card" style="padding: 1rem 1.4rem 1rem;">
-    <canvas id="wave" width="640" height="90"></canvas>
-    <div class="progress-wrap"><div id="progress-bar"></div></div>
+  <!-- 웨이브폼 + 액션 -->
+  <div class="card">
+    <canvas class="waveform" id="waveform" width="600" height="90"></canvas>
+    <div class="progress-wrap"><div class="progress-bar" id="progress-bar"></div></div>
     <div class="actions">
-      <button class="btn btn-gen" id="btn-gen">🎵 음악 생성</button>
-      <button class="btn btn-stop" id="btn-stop" disabled>⏹ 정지</button>
-      <a class="btn btn-dl" id="btn-dl" style="display:none">⬇ MIDI 다운로드</a>
+      <button class="btn btn-generate" id="btn-gen">🎵 음악 생성</button>
+      <button class="btn btn-play" id="btn-play" disabled>▶ 재생</button>
+      <a class="btn btn-download" id="btn-dl" style="display:none">⬇ MIDI 다운로드</a>
     </div>
     <div id="status-bar">준비 완료</div>
+  </div>
+
+  <!-- 내보내기 가이드 -->
+  <div class="card">
+    <h2>내보낸 뒤 이렇게 진행하세요</h2>
+    <ol class="export-card">
+      <li>MIDI를 Ableton Live 같은 DAW로 가져옵니다.</li>
+      <li>멜로디는 square/triangle, 베이스는 단순 루트음, 드럼은 노이즈 계열로 교체합니다.</li>
+      <li>루프가 자연스럽게 이어지면 WAV/OGG로 렌더링해 게임에 넣습니다.</li>
+    </ol>
   </div>
 </div>
 
 <script>
-// ─── State ──────────────────────────────────────────────────────────────────
-let bpm   = 120;
-let key   = 'C';
-let genre = 'Pop';
-let bars  = 8;
-let playing = false;
+// ─── 상수 ──────────────────────────────────────────────────────────
+const KEY_MIDI  = { C: 60, D: 62, E: 64, F: 65, G: 67, A: 69, B: 71 };
+const SCALE_MAJOR = [0, 2, 4, 5, 7, 9, 11];
+const SCALE_MINOR = [0, 2, 3, 5, 7, 8, 10];
+const CHORD_DEGREES = [0, 5, 7, 0];
+const DARK_CHORD_DEGREES = [0, 8, 3, 10];
+const MAJOR_CHORD = [0, 4, 7];
+const MINOR_CHORD = [0, 3, 7];
 
-// MIDI note roots
-const KEY_MIDI  = { C:60, D:62, E:64, F:65, G:67, A:69, B:71 };
-const SCALE_INT = [0,2,4,5,7,9,11];          // major scale
-const CHORD_DEG = [0,5,7,0];                  // I-IV-V-I (semitones)
-const CHORD_INT = [0,4,7];                    // major chord
+const GAME_PRESETS = {
+  field: {
+    bpm: 88, key: 'A', genre: 'Game OST', length: 'loop', 
+    mood: 'mysterious', complexity: 'simple', dynamics: 'normal'
+  },
+  battle: {
+    bpm: 100, key: 'E', genre: 'Game OST', length: 'loop',
+    mood: 'dark', complexity: 'complex', dynamics: 'strong'
+  },
+  town: {
+    bpm: 92, key: 'C', genre: 'Game OST', length: 'loop',
+    mood: 'bright', complexity: 'simple', dynamics: 'soft'
+  },
+};
 
-// Tone.js objects
-let part       = null;
-let analyser   = null;
-let synthsList = [];
-let animId     = null;
-let stopTimer  = null;
-let transport  = null;
-let progressInterval = null;
-let startTime  = 0;
-let totalDur   = 0;
+// ─── 상태 ──────────────────────────────────────────────────────────
+let state = {
+  bpm: 88,
+  key: 'A',
+  genre: 'Game OST',
+  length: 'loop',
+  mood: 'mysterious',
+  complexity: 'simple',
+  dynamics: 'normal',
+  playing: false,
+};
 
-// ─── DOM refs ────────────────────────────────────────────────────────────────
-const canvas      = document.getElementById('wave');
-const ctx2d       = canvas.getContext('2d');
-const btnGen      = document.getElementById('btn-gen');
-const btnStop     = document.getElementById('btn-stop');
-const btnDl       = document.getElementById('btn-dl');
-const statusBar   = document.getElementById('status-bar');
+let audio = {
+  part: null,
+  synths: [],
+  analyser: null,
+  animId: null,
+  stopTimer: null,
+  progressInterval: null,
+};
+
+// ─── DOM 참조 ──────────────────────────────────────────────────────
+const canvas = document.getElementById('waveform');
+const ctx2d = canvas.getContext('2d');
+const btnGen = document.getElementById('btn-gen');
+const btnPlay = document.getElementById('btn-play');
+const btnDl = document.getElementById('btn-dl');
+const statusBar = document.getElementById('status-bar');
 const progressBar = document.getElementById('progress-bar');
+const bpmVal = document.getElementById('bpm-val');
+const bpmNote = document.getElementById('bpm-note');
+const bpmInput = document.getElementById('bpm');
 
-// ─── Control wiring ──────────────────────────────────────────────────────────
-document.getElementById('bpm').addEventListener('input', e => {
-  bpm = +e.target.value;
-  document.getElementById('bpm-val').textContent = bpm;
-});
+// ─── 초기화 ──────────────────────────────────────────────────────
+function initControls() {
+  // BPM
+  bpmInput.addEventListener('input', e => {
+    state.bpm = +e.target.value;
+    updateBpmDisplay();
+  });
 
-function wireGroup(id, cb) {
-  document.getElementById(id).addEventListener('click', e => {
+  // 버튼 그룹 연결
+  connectGroup('key-group', v => { state.key = v; });
+  connectGroup('genre-group', v => { state.genre = v; updateBpmDisplay(); });
+  connectGroup('length-group', v => { state.length = v; });
+  connectGroup('mood-group', v => { state.mood = v; });
+  connectGroup('complexity-group', v => { state.complexity = v; });
+  connectGroup('dynamics-group', v => { state.dynamics = v; });
+
+  // 프리셋
+  document.querySelectorAll('.preset-card').forEach(btn => {
+    btn.addEventListener('click', () => applyPreset(btn.dataset.preset));
+  });
+
+  // 버튼
+  btnGen.addEventListener('click', handleGenerate);
+  btnPlay.addEventListener('click', handlePlay);
+
+  clearCanvas();
+}
+
+function connectGroup(id, callback) {
+  const group = document.getElementById(id);
+  group.addEventListener('click', e => {
     const btn = e.target.closest('button');
     if (!btn) return;
-    document.querySelectorAll(`#${id} button`).forEach(b => b.classList.remove('active'));
+    group.querySelectorAll('button').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
-    cb(btn.dataset.val);
+    callback(btn.dataset.val);
   });
 }
-wireGroup('key-group',   v => { key   = v; });
-wireGroup('genre-group', v => { genre = v; });
-wireGroup('bars-group',  v => { bars  = +v; });
 
-// ─── Stop all audio ───────────────────────────────────────────────────────────
+function updateBpmDisplay() {
+  const effective = getEffectiveBpm();
+  bpmVal.textContent = effective;
+  bpmNote.style.display = state.genre === 'Game OST' ? 'block' : 'none';
+}
+
+function getEffectiveBpm() {
+  return state.genre === 'Game OST' ? Math.max(80, Math.min(100, state.bpm)) : state.bpm;
+}
+
+function applyPreset(presetKey) {
+  const preset = GAME_PRESETS[presetKey];
+  if (!preset) return;
+  
+  Object.assign(state, preset);
+  
+  // UI 업데이트
+  bpmInput.value = state.bpm;
+  document.getElementById('key-group').querySelectorAll('button').forEach(b => {
+    b.classList.toggle('active', b.dataset.val === state.key);
+  });
+  document.getElementById('genre-group').querySelectorAll('button').forEach(b => {
+    b.classList.toggle('active', b.dataset.val === state.genre);
+  });
+  document.getElementById('length-group').querySelectorAll('button').forEach(b => {
+    b.classList.toggle('active', b.dataset.val === state.length);
+  });
+  document.getElementById('mood-group').querySelectorAll('button').forEach(b => {
+    b.classList.toggle('active', b.dataset.val === state.mood);
+  });
+  document.getElementById('complexity-group').querySelectorAll('button').forEach(b => {
+    b.classList.toggle('active', b.dataset.val === state.complexity);
+  });
+  document.getElementById('dynamics-group').querySelectorAll('button').forEach(b => {
+    b.classList.toggle('active', b.dataset.val === state.dynamics);
+  });
+
+  // 프리셋 카드 활성화
+  document.querySelectorAll('.preset-card').forEach(c => {
+    c.classList.toggle('active', c.dataset.preset === presetKey);
+  });
+
+  updateBpmDisplay();
+}
+
+// ─── 재생/정지 ──────────────────────────────────────────────────────
 function stopAll() {
-  if (part)  { part.dispose(); part = null; }
+  if (audio.part) { audio.part.dispose(); audio.part = null; }
   Tone.Transport.stop();
   Tone.Transport.cancel();
-  if (animId) { cancelAnimationFrame(animId); animId = null; }
-  if (stopTimer) { clearTimeout(stopTimer); stopTimer = null; }
-  if (progressInterval) { clearInterval(progressInterval); progressInterval = null; }
-  synthsList.forEach(s => s.dispose());
-  synthsList = [];
-  if (analyser) { analyser.dispose(); analyser = null; }
-  playing = false;
-  btnGen.disabled  = false;
-  btnStop.disabled = true;
+  if (audio.animId) { cancelAnimationFrame(audio.animId); audio.animId = null; }
+  if (audio.stopTimer) { clearTimeout(audio.stopTimer); audio.stopTimer = null; }
+  if (audio.progressInterval) { clearInterval(audio.progressInterval); audio.progressInterval = null; }
+  audio.synths.forEach(s => s?.dispose?.());
+  audio.synths = [];
+  if (audio.analyser) { audio.analyser.dispose(); audio.analyser = null; }
+  state.playing = false;
+  btnGen.disabled = false;
+  btnPlay.disabled = true;
+  btnPlay.textContent = '▶ 재생';
   progressBar.style.width = '0%';
   clearCanvas();
 }
@@ -292,16 +585,13 @@ function clearCanvas() {
   ctx2d.lineTo(canvas.width, canvas.height / 2);
   ctx2d.stroke();
 }
-clearCanvas();
 
-// ─── Waveform draw loop ───────────────────────────────────────────────────────
 function drawWave() {
-  if (!analyser) return;
-  const data = analyser.getValue();
+  if (!audio.analyser) return;
+  const data = audio.analyser.getValue();
   const w = canvas.width, h = canvas.height;
   ctx2d.clearRect(0, 0, w, h);
 
-  // background grid line
   ctx2d.strokeStyle = '#2a2a4a';
   ctx2d.lineWidth = 1;
   ctx2d.beginPath();
@@ -309,11 +599,10 @@ function drawWave() {
   ctx2d.lineTo(w, h / 2);
   ctx2d.stroke();
 
-  // waveform
   ctx2d.strokeStyle = '#7c6fff';
   ctx2d.lineWidth = 2;
   ctx2d.shadowColor = '#7c6fff';
-  ctx2d.shadowBlur  = 6;
+  ctx2d.shadowBlur = 6;
   ctx2d.beginPath();
   for (let i = 0; i < data.length; i++) {
     const x = (i / (data.length - 1)) * w;
@@ -323,127 +612,21 @@ function drawWave() {
   ctx2d.stroke();
   ctx2d.shadowBlur = 0;
 
-  animId = requestAnimationFrame(drawWave);
+  audio.animId = requestAnimationFrame(drawWave);
 }
 
-// ─── Tone.js MIDI sequence builder ───────────────────────────────────────────
-function buildAndPlay() {
-  Tone.Transport.bpm.value = bpm;
-
-  const rootMidi = KEY_MIDI[key] || 60;
-  const scale    = SCALE_INT.map(i => rootMidi + i);
-
-  // Genre-based synth flavour
-  let oscType = 'triangle';
-  if (genre === 'Electronic') oscType = 'sawtooth';
-  else if (genre === 'Ambient') oscType = 'sine';
-
-  // Chord synth
-  const chordSynth = new Tone.PolySynth(Tone.Synth, {
-    oscillator: { type: oscType },
-    envelope: { attack: genre === 'Ambient' ? 0.4 : 0.05, decay: 0.1, sustain: 0.6, release: genre === 'Ambient' ? 1.5 : 0.5 },
-    volume: -12,
-  }).toDestination();
-
-  // Melody synth
-  const melodySynth = new Tone.Synth({
-    oscillator: { type: 'sine' },
-    envelope: { attack: 0.01, decay: 0.05, sustain: 0.5, release: 0.3 },
-    volume: -10,
-  }).toDestination();
-
-  // Drums (less prominent for Ambient)
-  const drumVol = genre === 'Ambient' ? -30 : -6;
-  const kickSynth = new Tone.MembraneSynth({ volume: drumVol }).toDestination();
-  const snareSynth = new Tone.NoiseSynth({
-    noise: { type: 'white' },
-    envelope: { attack: 0.001, decay: 0.15, sustain: 0, release: 0.05 },
-    volume: drumVol - 4,
-  }).toDestination();
-  const hihatSynth = new Tone.MetalSynth({
-    frequency: 400,
-    envelope: { attack: 0.001, decay: 0.04, release: 0.01 },
-    harmonicity: 5.1,
-    modulationIndex: 32,
-    resonance: 4000,
-    octaves: 1.5,
-    volume: drumVol - 8,
-  }).toDestination();
-
-  // Analyser
-  analyser = new Tone.Analyser('waveform', 256);
-  chordSynth.connect(analyser);
-  melodySynth.connect(analyser);
-
-  synthsList = [chordSynth, melodySynth, kickSynth, snareSynth, hihatSynth];
-
-  // Build events
-  const events = [];
-  for (let bar = 0; bar < bars; bar++) {
-    const degree    = CHORD_DEG[bar % CHORD_DEG.length];
-    const chordRoot = rootMidi + degree;
-    const chordNotes = CHORD_INT.map(i => Tone.Frequency(chordRoot + i, 'midi').toNote());
-
-    const barSec = Tone.Time(`${bar}m`).toSeconds();
-
-    // Chord (whole bar)
-    events.push([barSec, () => chordSynth.triggerAttackRelease(chordNotes, '2n')]);
-
-    for (let beat = 0; beat < 4; beat++) {
-      const beatSec = barSec + Tone.Time(`${beat}n`).toSeconds();
-      const offSec  = beatSec + Tone.Time('8n').toSeconds();
-
-      // Melody
-      const note = Tone.Frequency(scale[Math.floor(Math.random() * scale.length)], 'midi').toNote();
-      events.push([beatSec, () => melodySynth.triggerAttackRelease(note, '8n')]);
-
-      // Hi-hat on beat + offbeat
-      events.push([beatSec, () => hihatSynth.triggerAttackRelease('32n')]);
-      events.push([offSec,  () => hihatSynth.triggerAttackRelease('32n')]);
-
-      // Kick on 1 & 3
-      if (beat === 0 || beat === 2)
-        events.push([beatSec, () => kickSynth.triggerAttackRelease('C1', '8n')]);
-
-      // Snare on 2 & 4
-      if (beat === 1 || beat === 3)
-        events.push([beatSec, () => snareSynth.triggerAttackRelease('8n')]);
-    }
-  }
-
-  part = new Tone.Part((time, fn) => fn(), events);
-  part.start(0);
-
-  Tone.Transport.start();
-  playing = true;
-  btnGen.disabled  = true;
-  btnStop.disabled = false;
-
-  // Progress bar
-  startTime = performance.now();
-  totalDur  = Tone.Time(`${bars}m`).toSeconds() * 1000;
-  progressInterval = setInterval(() => {
-    const pct = Math.min(100, ((performance.now() - startTime) / totalDur) * 100);
-    progressBar.style.width = pct + '%';
-  }, 100);
-
-  // Draw waveform
-  drawWave();
-
-  // Auto-stop
-  stopTimer = setTimeout(() => {
-    stopAll();
-    setStatus('재생 완료 ✅');
-    progressBar.style.width = '100%';
-  }, totalDur + 500);
-}
-
-// ─── MIDI file builder (pure JS) ─────────────────────────────────────────────
+// ─── MIDI 생성 ──────────────────────────────────────────────────────
 function buildMidi() {
-  const rootMidi   = KEY_MIDI[key] || 60;
-  const scale      = SCALE_INT.map(i => rootMidi + i);
-  const TPB        = 480;
-  const tempo      = Math.round(60_000_000 / bpm); // µs per beat
+  const rootMidi = KEY_MIDI[state.key] || 60;
+  const isDarkTone = state.genre === 'Game OST' || state.mood !== 'bright';
+  const scaleIntervals = isDarkTone ? SCALE_MINOR : SCALE_MAJOR;
+  const chordDegrees = isDarkTone ? DARK_CHORD_DEGREES : CHORD_DEGREES;
+  const chordIntervals = isDarkTone ? MINOR_CHORD : MAJOR_CHORD;
+  const scale = scaleIntervals.map(i => rootMidi + i);
+
+  const bars = state.length === 'loop' ? 16 : state.length === '1min' ? 30 : 90;
+  const TPB = 480;
+  const tempo = Math.round(60_000_000 / getEffectiveBpm());
 
   function varLen(n) {
     const out = [];
@@ -454,41 +637,23 @@ function buildMidi() {
   }
 
   function trackChunk(events) {
-    // events: array of [deltaTime, ...bytes]
     const data = [];
     for (const [dt, ...bytes] of events) {
       data.push(...varLen(dt), ...bytes);
     }
-    // end of track
     data.push(0x00, 0xff, 0x2f, 0x00);
     const len = data.length;
-    return [
-      0x4d, 0x54, 0x72, 0x6b,   // "MTrk"
-      (len >> 24) & 0xff, (len >> 16) & 0xff, (len >> 8) & 0xff, len & 0xff,
-      ...data,
-    ];
+    return [0x4d, 0x54, 0x72, 0x6b, (len >> 24) & 0xff, (len >> 16) & 0xff, (len >> 8) & 0xff, len & 0xff, ...data];
   }
 
-  // Header chunk
-  const header = [
-    0x4d, 0x54, 0x68, 0x64,  // "MThd"
-    0, 0, 0, 6,               // chunk length = 6
-    0, 1,                     // format 1
-    0, 3,                     // num tracks
-    (TPB >> 8) & 0xff, TPB & 0xff,
-  ];
+  const header = [0x4d, 0x54, 0x68, 0x64, 0, 0, 0, 6, 0, 1, 0, 3, (TPB >> 8) & 0xff, TPB & 0xff];
 
-  // ── Tempo track
-  const tempoTrack = trackChunk([
-    [0, 0xff, 0x51, 0x03, (tempo >> 16) & 0xff, (tempo >> 8) & 0xff, tempo & 0xff],
-  ]);
+  const tempoTrack = trackChunk([[0, 0xff, 0x51, 0x03, (tempo >> 16) & 0xff, (tempo >> 8) & 0xff, tempo & 0xff]]);
 
-  // Helper: collect note events
   function noteEvents(noteList) {
-    // noteList: [{t, note, vel, dur, ch}]
     const raw = [];
     noteList.forEach(({ t, note, vel, dur, ch }) => {
-      raw.push([t,       0x90 | ch, note, vel]);
+      raw.push([t, 0x90 | ch, note, vel]);
       raw.push([t + dur, 0x80 | ch, note, 0]);
     });
     raw.sort((a, b) => a[0] - b[0]);
@@ -502,34 +667,33 @@ function buildMidi() {
   }
 
   const beat = TPB;
-  const bar  = beat * 4;
+  const bar = beat * 4;
 
-  // ── Chord + Melody track
   const notes = [];
   for (let b = 0; b < bars; b++) {
-    const degree    = CHORD_DEG[b % CHORD_DEG.length];
+    const degree = chordDegrees[b % chordDegrees.length];
     const chordRoot = rootMidi + degree;
-    // Chord (2 beats)
-    CHORD_INT.forEach(i => {
+    chordIntervals.forEach(i => {
       notes.push({ t: b * bar, note: chordRoot + i, vel: 80, dur: beat * 2 - 1, ch: 0 });
     });
-    // Melody (quarter notes)
+    const hookPattern = [0, 3, 5, 3];
     for (let bt = 0; bt < 4; bt++) {
-      const n = scale[Math.floor(Math.random() * scale.length)];
+      const n = state.genre === 'Game OST' || state.mood === 'mysterious'
+        ? chordRoot + hookPattern[bt % hookPattern.length]
+        : scale[Math.floor(Math.random() * scale.length)];
       notes.push({ t: b * bar + bt * beat, note: n, vel: 90, dur: beat - 1, ch: 1 });
     }
   }
   const chordMelodyTrack = trackChunk(noteEvents(notes));
 
-  // ── Drum track (channel 9)
   const drums = [];
   for (let b = 0; b < bars; b++) {
     for (let bt = 0; bt < 4; bt++) {
       const t = b * bar + bt * beat;
-      drums.push({ t,             note: 42, vel: 70, dur: beat / 2 - 1, ch: 9 }); // hi-hat
-      drums.push({ t: t + beat/2, note: 42, vel: 60, dur: beat / 2 - 1, ch: 9 }); // off hi-hat
-      if (bt === 0 || bt === 2) drums.push({ t, note: 36, vel: 100, dur: beat - 1, ch: 9 }); // kick
-      if (bt === 1 || bt === 3) drums.push({ t, note: 38, vel: 90,  dur: beat - 1, ch: 9 }); // snare
+      drums.push({ t, note: 42, vel: 70, dur: beat / 2 - 1, ch: 9 });
+      drums.push({ t: t + beat / 2, note: 42, vel: 60, dur: beat / 2 - 1, ch: 9 });
+      if (bt === 0 || bt === 2) drums.push({ t, note: 36, vel: 100, dur: beat - 1, ch: 9 });
+      if (bt === 1 || bt === 3) drums.push({ t, note: 38, vel: 90, dur: beat - 1, ch: 9 });
     }
   }
   const drumTrack = trackChunk(noteEvents(drums));
@@ -538,33 +702,171 @@ function buildMidi() {
   return bytes;
 }
 
-// ─── Buttons ─────────────────────────────────────────────────────────────────
-function setStatus(msg, err = false) {
-  statusBar.textContent = msg;
-  statusBar.className   = err ? 'err' : '';
+// ─── Tone.js 재생 ──────────────────────────────────────────────────
+function playLocally() {
+  stopAll();
+
+  Tone.Transport.bpm.value = getEffectiveBpm();
+  const rootMidi = KEY_MIDI[state.key] || 60;
+  const isDarkTone = state.genre === 'Game OST' || state.mood !== 'bright';
+  const scaleIntervals = isDarkTone ? SCALE_MINOR : SCALE_MAJOR;
+  const chordDegrees = isDarkTone ? DARK_CHORD_DEGREES : CHORD_DEGREES;
+  const chordIntervals = isDarkTone ? MINOR_CHORD : MAJOR_CHORD;
+  const scale = scaleIntervals.map(i => rootMidi + i);
+  const bars = state.length === 'loop' ? 16 : state.length === '1min' ? 30 : 90;
+
+  const chordSynth = new Tone.PolySynth(Tone.Synth, {
+    oscillator: { type: isDarkTone ? 'square' : 'triangle' },
+    envelope: { attack: 0.01, decay: 0.08, sustain: 0.45, release: 0.15 },
+    volume: -12,
+  }).toDestination();
+
+  const melodySynth = new Tone.Synth({
+    oscillator: { type: state.mood === 'bright' ? 'square' : 'triangle' },
+    envelope: { attack: 0.005, decay: 0.05, sustain: 0.35, release: 0.08 },
+    volume: { soft: -12, normal: -8, strong: -4 }[state.dynamics] ?? -8,
+  }).toDestination();
+
+  const bassSynth = new Tone.MonoSynth({
+    oscillator: { type: 'square' },
+    filter: { Q: 1, type: 'lowpass', rolloff: -12 },
+    envelope: { attack: 0.005, decay: 0.12, sustain: 0.3, release: 0.08 },
+    filterEnvelope: { attack: 0.001, decay: 0.08, sustain: 0.2, release: 0.05, baseFrequency: 120, octaves: 2 },
+    volume: -10,
+  }).toDestination();
+
+  const drumVolMap = { soft: -16, normal: -9, strong: -4 };
+  const kickSynth = new Tone.MembraneSynth({ volume: drumVolMap[state.dynamics] ?? -9 }).toDestination();
+  const snareSynth = new Tone.NoiseSynth({
+    noise: { type: 'white' },
+    envelope: { attack: 0.001, decay: 0.15, sustain: 0, release: 0.05 },
+    volume: (drumVolMap[state.dynamics] ?? -9) - 6,
+  }).toDestination();
+  const hihatSynth = new Tone.MetalSynth({
+    frequency: 400,
+    envelope: { attack: 0.001, decay: 0.05, release: 0.01 },
+    harmonicity: 5.1,
+    modulationIndex: 32,
+    resonance: 4000,
+    octaves: 1.5,
+    volume: (drumVolMap[state.dynamics] ?? -9) - 10,
+  }).toDestination();
+
+  audio.analyser = new Tone.Analyser('waveform', 256);
+  chordSynth.connect(audio.analyser);
+  melodySynth.connect(audio.analyser);
+  bassSynth.connect(audio.analyser);
+
+  audio.synths = [chordSynth, melodySynth, bassSynth, kickSynth, snareSynth, hihatSynth];
+
+  const events = [];
+  const hookPattern = [0, 3, 5, 3];
+  const quarter = Tone.Time('4n').toSeconds();
+
+  for (let bar = 0; bar < bars; bar++) {
+    const degree = chordDegrees[bar % chordDegrees.length];
+    const chordRoot = rootMidi + degree;
+    const chordNotes = chordIntervals.map(i => Tone.Frequency(chordRoot + i, 'midi').toNote());
+
+    const barSec = Tone.Time(`${bar}m`).toSeconds();
+    events.push([barSec, () => chordSynth.triggerAttackRelease(chordNotes, '2n')]);
+
+    for (let beat = 0; beat < 4; beat++) {
+      const beatSec = barSec + Tone.Time(`${beat}n`).toSeconds();
+      const offSec = beatSec + Tone.Time('8n').toSeconds();
+
+      const noteMidi = state.genre === 'Game OST' || state.mood === 'mysterious'
+        ? chordRoot + hookPattern[beat % hookPattern.length]
+        : scale[Math.floor(Math.random() * scale.length)];
+      const note = Tone.Frequency(noteMidi, 'midi').toNote();
+      events.push([beatSec, () => melodySynth.triggerAttackRelease(note, '8n')]);
+
+      // Bass
+      const bassNote = Tone.Frequency(chordRoot - 12, 'midi').toNote();
+      if (beat === 0 || beat === 2) {
+        events.push([beatSec, () => bassSynth.triggerAttackRelease(bassNote, '8n')]);
+      }
+
+      // Drums
+      if (!(state.dynamics === 'soft' && beat === 3)) {
+        events.push([beatSec, () => hihatSynth.triggerAttackRelease('32n')]);
+      }
+      if (beat === 0 || beat === 2) events.push([beatSec, () => kickSynth.triggerAttackRelease('C1', '8n')]);
+      if (beat === 1 || beat === 3) events.push([beatSec, () => snareSynth.triggerAttackRelease('8n')]);
+      if (state.complexity !== 'simple') {
+        events.push([offSec, () => hihatSynth.triggerAttackRelease('32n')]);
+      }
+    }
+  }
+
+  audio.part = new Tone.Part((time, fn) => fn(), events);
+  audio.part.start(0);
+
+  if (state.length === 'loop') {
+    Tone.Transport.loop = true;
+    Tone.Transport.loopStart = 0;
+    Tone.Transport.loopEnd = `${bars}m`;
+  }
+
+  Tone.Transport.start();
+  state.playing = true;
+  btnGen.disabled = true;
+  btnPlay.disabled = false;
+  btnPlay.textContent = '⏹ 정지';
+  statusBar.textContent = `재생 중 ▶ | 키: ${state.key} BPM: ${getEffectiveBpm()} 장르: ${state.genre}`;
+
+  const startTime = performance.now();
+  const totalDur = Tone.Time(`${bars}m`).toSeconds() * 1000;
+  audio.progressInterval = setInterval(() => {
+    const pct = Math.min(100, ((performance.now() - startTime) / totalDur) * 100);
+    progressBar.style.width = pct + '%';
+  }, 100);
+
+  drawWave();
+
+  if (state.length !== 'loop') {
+    audio.stopTimer = setTimeout(() => {
+      stopAll();
+      statusBar.textContent = '재생 완료 ✅';
+      progressBar.style.width = '100%';
+    }, totalDur + 500);
+  }
 }
 
-btnGen.addEventListener('click', async () => {
+// ─── 이벤트 핸들러 ──────────────────────────────────────────────────
+function setStatus(msg, err = false) {
+  statusBar.textContent = msg;
+  statusBar.className = err ? 'err' : '';
+}
+
+async function handleGenerate() {
   stopAll();
   await Tone.start();
   setStatus('생성 중… 🎶');
 
-  // Build MIDI for download first
   const midiBytes = buildMidi();
   const blob = new Blob([midiBytes], { type: 'audio/midi' });
-  const url  = URL.createObjectURL(blob);
-  btnDl.href     = url;
-  btnDl.download = `makemusic_${key}_${bpm}bpm.mid`;
+  const url = URL.createObjectURL(blob);
+  btnDl.href = url;
+  btnDl.download = `makemusic_${state.key}_${getEffectiveBpm()}bpm.mid`;
   btnDl.style.display = 'inline-flex';
 
-  buildAndPlay();
-  setStatus(`재생 중 ▶  |  키: ${key}  BPM: ${bpm}  장르: ${genre}  ${bars}마디`);
-});
+  playLocally();
+  setStatus(`재생 중 ▶ | 키: ${state.key} BPM: ${getEffectiveBpm()} 장르: ${state.genre} ${state.length === 'loop' ? '루프' : ''}`);
+}
 
-btnStop.addEventListener('click', () => {
-  stopAll();
-  setStatus('정지됨');
-});
+function handlePlay() {
+  if (state.playing) {
+    stopAll();
+    setStatus('정지됨');
+  } else {
+    playLocally();
+  }
+}
+
+// ─── 시작 ──────────────────────────────────────────────────────────
+initControls();
+applyPreset('field');
 </script>
 </body>
 </html>
