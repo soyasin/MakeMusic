@@ -132,6 +132,15 @@ input[type='range'] {
   cursor: pointer;
 }
 
+.select-control {
+  width: 100%;
+  background: #252540;
+  border: 1px solid #3a3a60;
+  color: #e0e0ff;
+  border-radius: 8px;
+  padding: 0.6rem 0.7rem;
+}
+
 .btn-group {
   display: flex;
   gap: 0.5rem;
@@ -174,7 +183,7 @@ input[type='range'] {
   flex-wrap: wrap;
 }
 
-.btn-generate, .btn-play, .btn-download {
+.btn-generate, .btn-new, .btn-play, .btn-download {
   padding: 0.75rem 1.6rem;
   border-radius: 10px;
   font-size: 1rem;
@@ -203,6 +212,15 @@ input[type='range'] {
 .btn-play:hover:not(:disabled) { background: #35355a; }
 .btn-play:disabled { opacity: 0.5; cursor: not-allowed; }
 
+.btn-new {
+  background: #252540;
+  color: #d8d8ff;
+  border: 1px solid #3a3a60;
+}
+
+.btn-new:hover:not(:disabled) { background: #35355a; }
+.btn-new:disabled { opacity: 0.5; cursor: not-allowed; }
+
 .btn-download {
   background: linear-gradient(135deg, #ff6fb4, #e040a0);
   color: #fff;
@@ -211,6 +229,16 @@ input[type='range'] {
 }
 
 .btn-download:hover { opacity: 0.88; }
+.btn-download:disabled,
+.btn-download.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.state-log {
+  margin-top: 0.9rem;
+  word-break: break-word;
+}
 
 .error-msg {
   margin-top: 1rem;

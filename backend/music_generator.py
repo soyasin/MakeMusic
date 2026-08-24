@@ -2,6 +2,7 @@ import mido
 from mido import MidiFile, MidiTrack, Message, MetaMessage
 import io
 import random
+from typing import Dict, Any, Optional
 
 # Note numbers for each key (MIDI)
 KEY_ROOT = {
@@ -26,6 +27,28 @@ KICK   = 36
 SNARE  = 38
 HIHAT  = 42
 
+MOOD_PROFILES: Dict[str, Dict[str, Any]] = {
+    'bright': {'dark_tone': False, 'melodic_bias': [0, 2, 4, 5, 7, 9, 11], 'velocity_offset': 6, 'drum_density': 1.0},
+    'dark': {'dark_tone': True, 'melodic_bias': [0, 2, 3, 5, 7, 8, 10], 'velocity_offset': -4, 'drum_density': 1.0},
+    'dreamy': {'dark_tone': False, 'melodic_bias': [0, 2, 4, 7, 9], 'velocity_offset': -6, 'drum_density': 0.75},
+    'tense': {'dark_tone': True, 'melodic_bias': [0, 1, 3, 6, 8, 10], 'velocity_offset': 2, 'drum_density': 1.2},
+    'lyrical': {'dark_tone': False, 'melodic_bias': [0, 2, 4, 5, 7, 9], 'velocity_offset': -2, 'drum_density': 0.9},
+    'epic': {'dark_tone': True, 'melodic_bias': [0, 3, 5, 7, 10], 'velocity_offset': 8, 'drum_density': 1.15},
+    'lofi': {'dark_tone': True, 'melodic_bias': [0, 2, 3, 5, 7], 'velocity_offset': -10, 'drum_density': 0.65},
+    'jazz': {'dark_tone': False, 'melodic_bias': [0, 2, 4, 6, 7, 9, 11], 'velocity_offset': -1, 'drum_density': 0.95},
+    'cinematic': {'dark_tone': True, 'melodic_bias': [0, 2, 3, 5, 7, 8, 10], 'velocity_offset': 4, 'drum_density': 1.05},
+    'mysterious': {'dark_tone': True, 'melodic_bias': [0, 2, 3, 5, 7, 8, 10], 'velocity_offset': -1, 'drum_density': 0.9},
+}
+
+REFERENCE_STYLE_TRAITS: Dict[str, Dict[str, Any]] = {
+    'none': {},
+    'imagine': {'mood': 'lyrical', 'rhythm_style': 'swing', 'section_repeats': 2, 'variation': 'medium'},
+    'billie_jean': {'mood': 'tense', 'rhythm_style': 'syncopated', 'instrumentation': 'groove_band', 'variation': 'high'},
+    'canon': {'mood': 'epic', 'rhythm_style': 'straight', 'section_repeats': 3, 'variation': 'low'},
+    'shape_of_you': {'mood': 'bright', 'rhythm_style': 'pulse', 'instrumentation': 'groove_band', 'variation': 'medium'},
+    'interstellar': {'mood': 'cinematic', 'rhythm_style': 'triplet', 'instrumentation': 'orchestral', 'variation': 'medium'},
+}
+
 def _bars_from_length_mode(length_mode: str) -> int:
     if length_mode == '3min':
         return 90
@@ -34,18 +57,56 @@ def _bars_from_length_mode(length_mode: str) -> int:
     return 30
 
 
+def _drum_should_hit(index: int, rhythm_style: str, rng: random.Random, density: float) -> bool:
+    base_probability = {
+        'straight': 1.0,
+        'swing': 0.8 if index % 2 == 1 else 1.0,
+        'syncopated': 0.65 if index % 2 == 0 else 1.0,
+        'triplet': 0.85,
+        'pulse': 0.7 if index in (1, 3, 5, 7) else 1.0,
+    }.get(rhythm_style, 1.0)
+    return rng.random() <= max(0.25, min(1.0, base_probability * density))
+
+
+def _notes_per_bar(complexity: str, variation: str, rhythm_style: str) -> int:
+    base = {'simple': 2, 'normal': 4, 'complex': 8}.get(complexity, 4)
+    variation_bonus = {'low': 0, 'medium': 1, 'high': 2}.get(variation, 1)
+    rhythm_bonus = 1 if rhythm_style in ('syncopated', 'triplet') else 0
+    return min(12, max(2, base + variation_bonus + rhythm_bonus))
+
+
+def _clamp_velocity(value: int) -> int:
+    return max(0, min(127, int(value)))
+
+
 def generate_midi(
     bpm: int,
     key: str,
     genre: str,
     length_mode: str,
     mood: str = 'bright',
+    scale: str = 'major',
+    rhythm_style: str = 'straight',
+    instrumentation: str = 'band',
+    section_repeats: int = 2,
     complexity: str = 'normal',
+    variation: str = 'medium',
     dynamics: str = 'normal',
+    reference_style: str = 'none',
+    seed: Optional[int] = None,
 ) -> bytes:
+    traits = REFERENCE_STYLE_TRAITS.get(reference_style, {})
+    mood = traits.get('mood', mood)
+    rhythm_style = traits.get('rhythm_style', rhythm_style)
+    instrumentation = traits.get('instrumentation', instrumentation)
+    section_repeats = int(traits.get('section_repeats', section_repeats))
+    variation = traits.get('variation', variation)
+
     bars = _bars_from_length_mode(length_mode)
+    bars *= max(1, min(8, section_repeats))
     if genre == 'Game OST':
         bpm = max(80, min(100, bpm))
+    rng = random.Random(seed)
 
     ticks_per_beat = 480
     tempo = mido.bpm2tempo(bpm)  # microseconds per beat
@@ -63,21 +124,27 @@ def generate_midi(
 
     # Build drum events with delta times
     events = []
+    mood_profile = MOOD_PROFILES.get(mood, MOOD_PROFILES['bright'])
+    drum_density = mood_profile['drum_density']
     drum_velocity_scale = {'soft': 0.7, 'normal': 1.0, 'strong': 1.25}.get(dynamics, 1.0)
+    if instrumentation in ('orchestral', 'piano_trio'):
+        drum_velocity_scale *= 0.65
+    elif instrumentation in ('electro_synth', 'groove_band'):
+        drum_velocity_scale *= 1.1
     for bar in range(bars):
         bar_start = bar * beat * 4
         for i in range(8):
             t = bar_start + i * eighth
-            if not (dynamics == 'soft' and i == 6):
-                events.append((t,          'note_on',  9, HIHAT, int(70 * drum_velocity_scale)))
+            if _drum_should_hit(i, rhythm_style, rng, drum_density) and not (dynamics == 'soft' and i == 6):
+                events.append((t,          'note_on',  9, HIHAT, _clamp_velocity(70 * drum_velocity_scale)))
                 events.append((t + eighth - 1, 'note_off', 9, HIHAT, 0))
         for beat_num in [0, 2]:
             t = bar_start + beat_num * beat
-            events.append((t,          'note_on',  9, KICK, int(100 * drum_velocity_scale)))
+            events.append((t,          'note_on',  9, KICK, _clamp_velocity(100 * drum_velocity_scale)))
             events.append((t + beat - 1, 'note_off', 9, KICK, 0))
         for beat_num in [1, 3]:
             t = bar_start + beat_num * beat
-            events.append((t,          'note_on',  9, SNARE, int(90 * drum_velocity_scale)))
+            events.append((t,          'note_on',  9, SNARE, _clamp_velocity(90 * drum_velocity_scale)))
             events.append((t + beat - 1, 'note_off', 9, SNARE, 0))
 
     events.sort(key=lambda x: x[0])
@@ -96,11 +163,12 @@ def generate_midi(
     chord_track.append(MetaMessage('track_name', name='Chords', time=0))
 
     root = KEY_ROOT.get(key, 60)
-    dark_tone = genre == 'Game OST' or mood in ('dark', 'mysterious')
-    scale_intervals = MINOR_SCALE if dark_tone else MAJOR_SCALE
+    dark_tone = mood_profile['dark_tone'] or genre == 'Game OST' or scale == 'minor'
+    scale_intervals = MINOR_SCALE if scale == 'minor' else MAJOR_SCALE
     chord_progression = GAME_OST_PROGRESSION if dark_tone else CHORD_PROGRESSION
     chord_intervals = MINOR_CHORD if dark_tone else MAJOR_CHORD
-    chord_velocity = {'soft': 60, 'normal': 80, 'strong': 96}.get(dynamics, 80)
+    chord_velocity = {'soft': 60, 'normal': 80, 'strong': 96}.get(dynamics, 80) + mood_profile['velocity_offset']
+    chord_velocity = max(30, min(120, chord_velocity))
 
     chord_events = []
     for bar in range(bars):
@@ -128,7 +196,8 @@ def generate_midi(
     bass_track.append(MetaMessage('track_name', name='Bass', time=0))
 
     bass_events = []
-    bass_velocity = {'soft': 56, 'normal': 72, 'strong': 88}.get(dynamics, 72)
+    bass_velocity = {'soft': 56, 'normal': 72, 'strong': 88}.get(dynamics, 72) + mood_profile['velocity_offset'] // 2
+    bass_velocity = max(28, min(110, bass_velocity))
     for bar in range(bars):
         semitone_offset = chord_progression[bar % len(chord_progression)]
         bass_root = root + semitone_offset - 12
@@ -153,26 +222,29 @@ def generate_midi(
     melody_track.append(MetaMessage('track_name', name='Melody', time=0))
 
     melody_events = []
-    game_ost_pattern = [0, 3, 5, 3]
-    melody_velocity = {'soft': 64, 'normal': 82, 'strong': 100}.get(dynamics, 82)
+    game_ost_pattern = [0, 3, 5, 3, 7, 5, 3, 2]
+    melody_velocity = {'soft': 64, 'normal': 82, 'strong': 100}.get(dynamics, 82) + mood_profile['velocity_offset']
+    melody_velocity = max(35, min(120, melody_velocity))
+    notes_per_bar = _notes_per_bar(complexity, variation, rhythm_style)
     for bar in range(bars):
         semitone_offset = chord_progression[bar % len(chord_progression)]
         chord_root = root + semitone_offset
-        if genre == 'Game OST' or mood == 'mysterious':
-            notes_per_bar = 4 if complexity != 'complex' else 8
+        if genre == 'Game OST' or mood in ('mysterious', 'cinematic'):
             note_duration = (beat * 4) // notes_per_bar
             for step in range(notes_per_bar):
-                note = chord_root + game_ost_pattern[step % len(game_ost_pattern)]
+                jitter = rng.choice([0, 0, 1, -1]) if variation == 'high' else 0
+                note = chord_root + game_ost_pattern[(step + bar) % len(game_ost_pattern)] + jitter
                 t_on = bar * beat * 4 + step * note_duration
                 t_off = t_on + note_duration - 1
                 melody_events.append((t_on, 'note_on', 1, note, melody_velocity - 8))
                 melody_events.append((t_off, 'note_off', 1, note, 0))
         else:
-            available = [chord_root + i for i in scale_intervals if 0 <= i <= 12]
-            notes_per_bar = 2 if complexity == 'simple' else 8 if complexity == 'complex' else 4
+            available = [chord_root + i for i in mood_profile['melodic_bias'] if i in scale_intervals]
+            if not available:
+                available = [chord_root + i for i in scale_intervals if 0 <= i <= 12]
             note_duration = (beat * 4) // notes_per_bar
             for beat_i in range(notes_per_bar):
-                note = random.choice(available)
+                note = rng.choice(available)
                 t_on  = bar * beat * 4 + beat_i * note_duration
                 t_off = t_on + note_duration - 1
                 melody_events.append((t_on,  'note_on',  1, note, melody_velocity))
