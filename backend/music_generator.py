@@ -164,7 +164,7 @@ def generate_midi(
 
     root = KEY_ROOT.get(key, 60)
     dark_tone = mood_profile['dark_tone'] or genre == 'Game OST' or scale == 'minor'
-    scale_intervals = MINOR_SCALE if scale == 'minor' else MAJOR_SCALE if scale == 'major' else (MINOR_SCALE if dark_tone else MAJOR_SCALE)
+    scale_intervals = MINOR_SCALE if scale == 'minor' else MAJOR_SCALE
     chord_progression = GAME_OST_PROGRESSION if dark_tone else CHORD_PROGRESSION
     chord_intervals = MINOR_CHORD if dark_tone else MAJOR_CHORD
     chord_velocity = {'soft': 60, 'normal': 80, 'strong': 96}.get(dynamics, 80) + mood_profile['velocity_offset']
@@ -239,7 +239,7 @@ def generate_midi(
                 melody_events.append((t_on, 'note_on', 1, note, melody_velocity - 8))
                 melody_events.append((t_off, 'note_off', 1, note, 0))
         else:
-            available = [chord_root + i for i in mood_profile['melodic_bias'] if i in scale_intervals or scale == 'minor']
+            available = [chord_root + i for i in mood_profile['melodic_bias'] if i in scale_intervals]
             if not available:
                 available = [chord_root + i for i in scale_intervals if 0 <= i <= 12]
             note_duration = (beat * 4) // notes_per_bar

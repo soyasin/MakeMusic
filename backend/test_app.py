@@ -56,6 +56,8 @@ class GenerateApiTests(unittest.TestCase):
 
         self.assertEqual(first.status_code, 200)
         self.assertEqual(second.status_code, 200)
+        self.assertEqual(first.headers.get('X-Generation-Seed'), '101')
+        self.assertEqual(second.headers.get('X-Generation-Seed'), '202')
         self.assertNotEqual(first.data, second.data)
 
 

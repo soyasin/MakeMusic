@@ -167,6 +167,8 @@ export default function App() {
   const animFrameRef = useRef(null);
   const canvasRef = useRef(null);
   const synthsRef = useRef(null);
+  const midiUrlRef = useRef(null);
+  const currentSongRef = useRef(null);
 
   const effectiveBpm = useMemo(() => getEffectiveBpm(options.genre, options.bpm), [options.genre, options.bpm]);
 
@@ -177,6 +179,10 @@ export default function App() {
   const updateOption = useCallback((field, value) => {
     setOptions((prev) => ({ ...prev, [field]: value }));
   }, []);
+
+  useEffect(() => {
+    currentSongRef.current = currentSong;
+  }, [currentSong]);
 
   const cleanupAudio = useCallback(() => {
     if (partRef.current) {
@@ -203,9 +209,9 @@ export default function App() {
     setPhase((prev) => (
       prev === WORKFLOW_PHASES.GENERATING
         ? WORKFLOW_PHASES.GENERATING
-        : (currentSong ? WORKFLOW_PHASES.READY : WORKFLOW_PHASES.EMPTY)
+        : (currentSongRef.current ? WORKFLOW_PHASES.READY : WORKFLOW_PHASES.EMPTY)
     ));
-  }, [cleanupAudio, currentSong]);
+  }, [cleanupAudio]);
 
   const clearCurrentComposition = useCallback(() => {
     cleanupAudio();
@@ -219,10 +225,14 @@ export default function App() {
     setLastSeed(null);
   }, [cleanupAudio]);
 
+  useEffect(() => {
+    midiUrlRef.current = midiUrl;
+  }, [midiUrl]);
+
   useEffect(() => () => {
     cleanupAudio();
-    if (midiUrl) URL.revokeObjectURL(midiUrl);
-  }, [cleanupAudio, midiUrl]);
+    if (midiUrlRef.current) URL.revokeObjectURL(midiUrlRef.current);
+  }, [cleanupAudio]);
 
   const drawWave = useCallback(() => {
     if (!canvasRef.current || !analyserRef.current) return;
@@ -414,7 +424,7 @@ export default function App() {
   };
 
   const handleGenerate = async () => {
-    const optionsSnapshot = { ...options, bpm: effectiveBpm };
+    const optionsSnapshot = { ...options };
     const seed = createSeed();
 
     clearCurrentComposition();
@@ -466,6 +476,8 @@ export default function App() {
 
   const canPlay = !!currentSong && phase !== WORKFLOW_PHASES.GENERATING;
   const canDownload = !!midiUrl && phase !== WORKFLOW_PHASES.GENERATING;
+  const canCreateInitial = phase !== WORKFLOW_PHASES.GENERATING;
+  const canCreateNew = !!currentSong && phase !== WORKFLOW_PHASES.GENERATING;
 
   return (
     <div className="app">
@@ -683,21 +695,25 @@ export default function App() {
         <canvas ref={canvasRef} className="waveform" width={600} height={100} />
 
         <div className="actions">
-          <button
-            className="btn-generate"
-            onClick={handleGenerate}
-            disabled={phase === WORKFLOW_PHASES.GENERATING}
-          >
-            {phase === WORKFLOW_PHASES.GENERATING ? '생성 중…' : '🎵 곡 만들기'}
-          </button>
+          {!currentSong && (
+            <button
+              className="btn-generate"
+              onClick={handleGenerate}
+              disabled={!canCreateInitial}
+            >
+              {phase === WORKFLOW_PHASES.GENERATING ? '생성 중…' : '🎵 곡 만들기'}
+            </button>
+          )}
 
-          <button
-            className="btn-new"
-            onClick={handleGenerate}
-            disabled={phase === WORKFLOW_PHASES.GENERATING}
-          >
-            ✨ 새로운 곡 만들기
-          </button>
+          {currentSong && (
+            <button
+              className="btn-new"
+              onClick={handleGenerate}
+              disabled={!canCreateNew}
+            >
+              ✨ 새로운 곡 만들기
+            </button>
+          )}
 
           <button
             className="btn-play"
